@@ -22,10 +22,18 @@ echo "🎬 Theater Bot — Setup & Launch"
 echo "=================================================="
 echo "   Using: $($PY --version)"
 
-# Step 1: Install dependencies
+# Step 1: Ensure pip is available
 echo ""
+echo "📦 Checking for pip..."
+if ! $PY -m pip --version &>/dev/null; then
+    echo "   ⚠️  pip not found — installing it now..."
+    $PY -m ensurepip --upgrade 2>/dev/null || sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip
+    echo "   ✅ pip installed!"
+fi
+
+# Step 2: Install dependencies
 echo "📦 Installing Python dependencies..."
-$PY -m pip install -r requirements.txt --quiet
+$PY -m pip install -r requirements.txt --quiet --break-system-packages 2>/dev/null || $PY -m pip install -r requirements.txt --quiet
 echo "   ✅ Dependencies installed!"
 
 # Step 2: Check for .env file
