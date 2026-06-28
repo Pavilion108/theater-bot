@@ -115,17 +115,25 @@ class TheaterBot:
         return None, None
 
     def find_theaters(self, lat, lon, radius=None):
-        radius = radius or SEARCH_RADIUS_METERS
+        search_radius = radius or SEARCH_RADIUS_METERS
+        theaters = []
+        
         if GOOGLE_PLACES_API_KEY:
-            theaters = self._search_google_places(lat, lon, radius)
+            theaters = self._search_google_places(lat, lon, search_radius)
             if theaters:
                 self.send(f"🗺 Found {len(theaters)} theaters via Google Places")
                 return theaters
             self.send("⚠️ Google Places returned no results — trying OSM...")
         
-        theaters = self._search_overpass(lat, lon, radius)
+        theaters = self._search_overpass(lat, lon, search_radius)
+        
+        # If still no theaters, try a much larger radius automatically
+        if not theaters and not radius:
+            self.send("⚠️ No theaters found within 8km. Expanding search to 25km...")
+            theaters = self._search_overpass(lat, lon, 25000)
+            
         if theaters:
-            self.send(f"🗺 Found {len(theaters)} theaters via OSM")
+            self.send(f"🗺 Found {len(theaters)} theaters nearby")
         return theaters
 
     @staticmethod
