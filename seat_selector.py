@@ -99,19 +99,20 @@ class SeatSelector:
         city_slug = city.lower().replace(" ", "") if city else "mumbai"
         query = urllib.parse.quote(theater_name)
         
-        # Using DuckDuckGo search that redirects to Paytm to avoid Google's login popups
-        url = f"https://duckduckgo.com/html/?q=site:paytm.com/movies+{query}+{city_slug}"
+        # Using Bing search to reliably find the theater without Google's login overlays
+        url = f"https://www.bing.com/search?q=site:paytm.com/movies+{query}+{city_slug}"
         self.driver.get(url)
         time.sleep(3)
         
-        # Click the first Paytm link
         try:
             links = self.driver.find_elements(By.CSS_SELECTOR, 'a[href*="paytm.com/movies"]')
             if links:
-                links[0].click()
-                time.sleep(4)
+                # Bing sometimes opens in new tab, we just grab the URL and navigate manually
+                target_url = links[0].get_attribute("href")
+                if target_url:
+                    self.driver.get(target_url)
+                    time.sleep(4)
             else:
-                # Fallback: Just go to Paytm movies homepage
                 self.driver.get("https://paytm.com/movies")
                 time.sleep(4)
         except Exception as e:
@@ -127,13 +128,12 @@ class SeatSelector:
         
         movies = self.driver.execute_script("""
             const movies = [];
-            // Look for generic movie links or headers
-            document.querySelectorAll('a[href*="/movies/"], h1, h2, h3, [class*="title"], [class*="movie"]').forEach((el, i) => {
+            document.querySelectorAll('a[href*="/movies/"], [class*="movie-title"], h3').forEach((el, i) => {
                 const name = el.textContent?.trim()?.split('\\n')[0] || '';
                 const href = el.tagName === 'A' ? el.getAttribute('href') : '';
-                if (name && name.length > 2 && name.length < 60) {
-                    // Filter out UI junk
-                    if (!['Home', 'Movies', 'Events', 'Offers', 'Login', 'Sign In'].includes(name) && !movies.find(m => m.name === name)) {
+                if (name && name.length > 2 && name.length < 50) {
+                    const badWords = ['Home', 'Movies', 'Events', 'Offers', 'Login', 'Sign', 'About', 'Contact', 'Paytm', 'Download'];
+                    if (!badWords.some(w => name.toLowerCase().includes(w.toLowerCase())) && !movies.find(m => m.name === name)) {
                         movies.push({ index: movies.length, name: name, url: href });
                     }
                 }

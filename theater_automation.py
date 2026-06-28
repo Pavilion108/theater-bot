@@ -314,7 +314,7 @@ class TheaterBot:
 
     def _resend_movies(self):
         lines = ["🍿 *Select a movie:*"]
-        for m in self.movies_cache:
+        for m in self.movies_cache[:25]:  # Limit to 25 to prevent Telegram message length error
             lines.append(f"  `{m['index']}` — {m['name']}")
         lines.append("\n↩️ Send `back` to choose another theater.")
         self.send("\n".join(lines))
