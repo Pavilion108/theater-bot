@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 import requests
 from geopy.geocoders import Nominatim
 
-from seat_selector import SeatSelector, run_async
+from seat_selector import SeatSelector
 from cookie_manager import save_cookies, get_cookie_export_snippet
 
 # Try to load .env file
@@ -169,7 +169,7 @@ class TheaterBot:
             log.info(f"[Cycle {cycle}] Reselecting seats...")
             
             try:
-                result = run_async(self.selector.refresh_and_reselect(self.ticket_count))
+                result = self.selector.refresh_and_reselect(self.ticket_count)
                 if result["success"]:
                     self.send(f"🔄 *Cycle {cycle}* - Refreshed and kept hold on seats:\n{result['message']}", photo_path=result.get("screenshot"))
                 else:
@@ -191,7 +191,7 @@ class TheaterBot:
         self.showtimes_cache = []
         
         try:
-            run_async(self.selector.stop())
+            self.selector.stop()
         except Exception:
             pass
             
@@ -273,15 +273,15 @@ class TheaterBot:
         self.selected_theater = self.theaters_cache[idx]
         self.send(f"⏳ Launching cloud browser for *{self.selected_theater['name']}*...")
         
-        # Start Playwright
-        run_async(self.selector.start())
+        # Start browser
+        self.selector.start()
         
         # Open BookMyShow
-        shot = run_async(self.selector.bms_open_theater(self.selected_theater['name']))
+        shot = self.selector.bms_open_theater(self.selected_theater['name'])
         self.send("📸 Here's the theater page:", photo_path=shot)
         
         # Get Movies
-        movies = run_async(self.selector.bms_get_movies(self.selector.page.url))
+        movies = self.selector.bms_get_movies(self.selector.page.url if hasattr(self.selector, 'page') else self.selector.driver.current_url)
         if not movies:
             self.send("❌ No movies found playing here. Send `/restart`.")
             return
@@ -304,9 +304,9 @@ class TheaterBot:
         self.send(f"⏳ Checking showtimes for *{movie['name']}*...")
         
         if 'url' in movie:
-            run_async(self.selector.navigate(movie['url']))
+            self.selector.driver.get(movie['url'])
         
-        shows = run_async(self.selector.bms_get_showtimes())
+        shows = self.selector.bms_get_showtimes()
         if not shows:
             self.send("❌ No showtimes found. Send `/restart`.")
             return
@@ -328,7 +328,7 @@ class TheaterBot:
         self.selected_showtime = show
         self.send("⏳ Opening seat layout...")
         
-        shot = run_async(self.selector.bms_open_seat_layout(idx))
+        shot = self.selector.bms_open_seat_layout(idx)
         self.send("📸 Seat layout opened:", photo_path=shot)
         
         self.send("🎟 How many tickets do you want? (e.g. `2`)")
@@ -338,9 +338,9 @@ class TheaterBot:
         self.ticket_count = int(text)
         self.send(f"🎯 Auto-selecting {self.ticket_count} best center seats...")
         
-        run_async(self.selector.bms_select_ticket_count(self.ticket_count))
+        self.selector.bms_select_ticket_count(self.ticket_count)
         
-        result = run_async(self.selector.select_best_seats(self.ticket_count))
+        result = self.selector.select_best_seats(self.ticket_count)
         if not result["success"]:
             self.send(f"❌ Failed: {result['message']}\nSend `/restart`.")
             return
@@ -390,7 +390,7 @@ class TheaterBot:
                 
         # Cleanup
         try:
-            run_async(self.selector.stop())
+            self.selector.stop()
         except:
             pass
 
