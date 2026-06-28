@@ -228,6 +228,26 @@ class TheaterBot:
             return
 
         try:
+            if text_stripped.lower() == "back":
+                if self.bot_state == "WAITING_MOVIE":
+                    self.bot_state = "WAITING_THEATER"
+                    self._resend_theaters()
+                    return
+                elif self.bot_state == "WAITING_SHOWTIME":
+                    self.bot_state = "WAITING_MOVIE"
+                    self._resend_movies()
+                    return
+                elif self.bot_state == "WAITING_COUNT":
+                    self.bot_state = "WAITING_SHOWTIME"
+                    self._resend_showtimes()
+                    return
+
+            if text_stripped.lower() in ("other", "other theaters"):
+                if self.bot_state in ("WAITING_MOVIE", "WAITING_SHOWTIME", "WAITING_COUNT"):
+                    self.bot_state = "WAITING_THEATER"
+                    self._resend_theaters()
+                    return
+
             if self.bot_state == "WAITING_LOCATION":
                 self._handle_location(text_stripped)
             elif self.bot_state == "WAITING_THEATER":
@@ -257,13 +277,15 @@ class TheaterBot:
             return
 
         self.theaters_cache = theaters
-        lines = [f"🎬 *Found {len(theaters)} theaters:*"]
-        for i, t in enumerate(theaters[:15]):  # limit to 15
+        self._resend_theaters()
+        self.bot_state = "WAITING_THEATER"
+
+    def _resend_theaters(self):
+        lines = [f"🎬 *Found {len(self.theaters_cache)} theaters:*"]
+        for i, t in enumerate(self.theaters_cache[:15]):
             lines.append(f"  `{i}` — *{t['name']}*")
         lines.append("\n📝 *Send the number* of the theater you want.")
-        
         self.send("\n".join(lines))
-        self.bot_state = "WAITING_THEATER"
 
     def _handle_theater(self, text):
         idx = int(text)
@@ -287,12 +309,15 @@ class TheaterBot:
             return
             
         self.movies_cache = movies
-        lines = ["🍿 *Select a movie:*"]
-        for m in movies:
-            lines.append(f"  `{m['index']}` — {m['name']}")
-        self.send("\n".join(lines))
-        
+        self._resend_movies()
         self.bot_state = "WAITING_MOVIE"
+
+    def _resend_movies(self):
+        lines = ["🍿 *Select a movie:*"]
+        for m in self.movies_cache:
+            lines.append(f"  `{m['index']}` — {m['name']}")
+        lines.append("\n↩️ Send `back` to choose another theater.")
+        self.send("\n".join(lines))
 
     def _handle_movie(self, text):
         idx = int(text)
@@ -312,12 +337,16 @@ class TheaterBot:
             return
             
         self.showtimes_cache = shows
-        lines = ["⏰ *Select a showtime:*"]
-        for s in shows:
-            lines.append(f"  `{s['index']}` — {s['time']}")
-        self.send("\n".join(lines))
-        
+        self._resend_showtimes()
         self.bot_state = "WAITING_SHOWTIME"
+
+    def _resend_showtimes(self):
+        lines = ["⏰ *Select a showtime:*"]
+        for s in self.showtimes_cache:
+            lines.append(f"  `{s['index']}` — {s['time']}")
+        lines.append("\n↩️ Send `back` to choose another movie.")
+        lines.append("🔁 Send `other` to choose another theater.")
+        self.send("\n".join(lines))
 
     def _handle_showtime(self, text):
         idx = int(text)
