@@ -256,6 +256,8 @@ class TheaterBot:
                 self._handle_movie(text_stripped)
             elif self.bot_state == "WAITING_SHOWTIME":
                 self._handle_showtime(text_stripped)
+            elif self.bot_state == "WAITING_SMART_THEATER":
+                self._handle_smart_theater(text_stripped)
             elif self.bot_state == "WAITING_COUNT":
                 self._handle_count(text_stripped)
             elif self.bot_state == "MONITORING":
@@ -332,13 +334,9 @@ class TheaterBot:
             self.selector.driver.get(movie['url'])
         shows = self.selector.bms_get_showtimes()
         if not shows:
-            # Remove this theater from the cache so they don't select it again
-            self.theaters_cache = [t for t in self.theaters_cache if t['name'] != self.selected_theater['name']]
-            
             self.send(f"❌ *No showtimes found* for '{movie['name']}' at this theater today.\n\n"
-                      "🔁 *Try these other nearby theaters:*")
-            self.bot_state = "WAITING_THEATER"
-            self._resend_theaters()
+                      f"🤖 *Smart Scan:* Automatically checking other nearby theaters for '{movie['name']}'... please wait a moment.")
+            self._smart_search_movie(movie)
             return
             
         self.showtimes_cache = shows
@@ -352,6 +350,71 @@ class TheaterBot:
         lines.append("\n↩️ Send `back` to choose another movie.")
         lines.append("🔁 Send `other` to choose another theater.")
         self.send("\n".join(lines))
+
+    def _smart_search_movie(self, target_movie):
+        """Scans nearby theaters to find which ones are actually playing the target movie."""
+        found_theaters = []
+        original_theater = self.selected_theater['name']
+        
+        # Scan the next 6 theaters to avoid taking too long
+        theaters_to_scan = [t for t in self.theaters_cache if t['name'] != original_theater][:6]
+        
+        for t in theaters_to_scan:
+            try:
+                self.selector.bms_open_theater(t['name'])
+                movies = self.selector.bms_get_movies(self.selector.driver.current_url)
+                
+                # Check if target movie exists here (fuzzy match)
+                matching_movie = next((m for m in movies if target_movie['name'].lower() in m['name'].lower() or m['name'].lower() in target_movie['name'].lower()), None)
+                
+                if matching_movie and 'url' in matching_movie:
+                    self.selector.driver.get(matching_movie['url'])
+                    shows = self.selector.bms_get_showtimes()
+                    if shows:
+                        found_theaters.append({
+                            'theater': t,
+                            'movie': matching_movie,
+                            'shows': shows
+                        })
+            except Exception as e:
+                log.error(f"Smart scan error for {t['name']}: {e}")
+                
+            if len(found_theaters) >= 3:
+                break # Stop early if we found a few good options
+
+        if not found_theaters:
+            self.send(f"❌ I checked nearby theaters and couldn't find any showtimes for '{target_movie['name']}'.\n\n"
+                      "Send `other` to look at different theaters manually, or `back` to choose a different movie.")
+            self.bot_state = "WAITING_SHOWTIME" # Keeps them in the movie state so they can use 'back'
+            return
+
+        self.smart_results = found_theaters
+        lines = [f"✅ *Found '{target_movie['name']}' playing nearby!*"]
+        for i, res in enumerate(found_theaters):
+            lines.append(f"  `{i}` — *{res['theater']['name']}* ({len(res['shows'])} shows)")
+        
+        lines.append("\n📝 *Send the number* to view these showtimes.")
+        self.send("\n".join(lines))
+        self.bot_state = "WAITING_SMART_THEATER"
+
+    def _handle_smart_theater(self, text):
+        idx = int(text)
+        if not (0 <= idx < len(self.smart_results)):
+            raise ValueError()
+            
+        result = self.smart_results[idx]
+        self.selected_theater = result['theater']
+        self.selected_movie = result['movie']
+        self.showtimes_cache = result['shows']
+        
+        self.send(f"✅ Selected *{self.selected_theater['name']}*.")
+        
+        # Navigate to that movie page again to ensure DOM is ready for seat selection
+        if 'url' in self.selected_movie:
+            self.selector.driver.get(self.selected_movie['url'])
+            
+        self._resend_showtimes()
+        self.bot_state = "WAITING_SHOWTIME"
 
     def _handle_showtime(self, text):
         idx = int(text)
