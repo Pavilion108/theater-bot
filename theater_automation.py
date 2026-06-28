@@ -330,11 +330,13 @@ class TheaterBot:
         
         if 'url' in movie:
             self.selector.driver.get(movie['url'])
-        
         shows = self.selector.bms_get_showtimes()
         if not shows:
+            # Remove this theater from the cache so they don't select it again
+            self.theaters_cache = [t for t in self.theaters_cache if t['name'] != self.selected_theater['name']]
+            
             self.send(f"❌ *No showtimes found* for '{movie['name']}' at this theater today.\n\n"
-                      "🔁 *Try another nearby theater:*")
+                      "🔁 *Try these other nearby theaters:*")
             self.bot_state = "WAITING_THEATER"
             self._resend_theaters()
             return
