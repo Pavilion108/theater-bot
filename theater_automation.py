@@ -354,43 +354,48 @@ class TheaterBot:
         self.send("\n".join(lines))
 
     def _smart_search_movie(self, target_movie):
-        """Scans nearby theaters to find which ones are actually playing the target movie."""
+        """Scans nearby theaters and future dates to compile a Movie Intelligence Report."""
+        intel_report = []
         found_theaters = []
         original_theater = self.selected_theater['name']
         
-        # Scan the next 6 theaters to avoid taking too long
+        # 1. Check future dates at CURRENT theater
+        try:
+            dates = self.selector.bms_get_dates()
+            future_dates = [d for d in dates if 'today' not in d['text'].lower()][:2] # Check next 2 dates
+            for d in future_dates:
+                self.selector.bms_click_date(d['id'])
+                future_shows = self.selector.bms_get_showtimes()
+                if future_shows:
+                    intel_report.append(f"📅 *{d['text']}* at this theater: {len(future_shows)} shows")
+        except Exception as e:
+            log.error(f"Error checking future dates: {e}")
+            
+        # 2. Check nearby theaters for TODAY
         theaters_to_scan = [t for t in self.theaters_cache if t['name'] != original_theater][:6]
         
         for t in theaters_to_scan:
             try:
                 self.selector.bms_open_theater(t['name'])
                 movies = self.selector.bms_get_movies(self.selector.driver.current_url)
-                
-                # Check if target movie exists here (fuzzy match)
                 matching_movie = next((m for m in movies if target_movie['name'].lower() in m['name'].lower() or m['name'].lower() in target_movie['name'].lower()), None)
-                
                 if matching_movie and 'url' in matching_movie:
                     self.selector.driver.get(matching_movie['url'])
                     shows = self.selector.bms_get_showtimes()
                     if shows:
-                        found_theaters.append({
-                            'theater': t,
-                            'movie': matching_movie,
-                            'shows': shows
-                        })
+                        found_theaters.append({'theater': t, 'movie': matching_movie, 'shows': shows})
             except Exception as e:
                 log.error(f"Smart scan error for {t['name']}: {e}")
-                
             if len(found_theaters) >= 3:
-                break # Stop early if we found a few good options
+                break
 
+        # 3. Expanded Search
         if not found_theaters and hasattr(self, 'current_lat'):
-            self.send(f"⚠️ Not found in the immediate area. Expanding search radius to 20km for '{target_movie['name']}'... please wait.")
+            self.send(f"⚠️ Not found nearby today. Expanding search radius to 20km for '{target_movie['name']}'...")
             try:
                 expanded_theaters = self.find_theaters(self.current_lat, self.current_lon, radius=20000)
-                # Filter out ones we already checked
                 checked_names = [t['name'] for t in theaters_to_scan] + [original_theater]
-                new_theaters = [t for t in expanded_theaters if t['name'] not in checked_names][:5]
+                new_theaters = [t for t in expanded_theaters if t['name'] not in checked_names][:4]
                 
                 for t in new_theaters:
                     try:
@@ -401,33 +406,40 @@ class TheaterBot:
                             self.selector.driver.get(matching_movie['url'])
                             shows = self.selector.bms_get_showtimes()
                             if shows:
-                                found_theaters.append({
-                                    'theater': t,
-                                    'movie': matching_movie,
-                                    'shows': shows
-                                })
-                    except Exception as e:
-                        log.error(f"Expanded smart scan error for {t['name']}: {e}")
-                        
-                    if len(found_theaters) >= 3:
+                                found_theaters.append({'theater': t, 'movie': matching_movie, 'shows': shows})
+                    except Exception:
+                        pass
+                    if len(found_theaters) >= 2:
                         break
-            except Exception as e:
-                log.error(f"Error during expanded search: {e}")
+            except Exception:
+                pass
 
-        if not found_theaters:
-            self.send(f"❌ I checked nearby and expanded theaters (20km radius) and couldn't find any showtimes for '{target_movie['name']}'.\n\n"
+        # 4. Compile Intel Report
+        if not found_theaters and not intel_report:
+            self.send(f"❌ *Total dead end.* I checked everywhere (future dates + 20km radius). '{target_movie['name']}' is not playing.\n\n"
                       "Send `other` to look at different theaters manually, or `back` to choose a different movie.")
-            self.bot_state = "WAITING_SHOWTIME" # Keeps them in the movie state so they can use 'back'
+            self.bot_state = "WAITING_SHOWTIME"
             return
 
-        self.smart_results = found_theaters
-        lines = [f"✅ *Found '{target_movie['name']}' playing nearby!*"]
-        for i, res in enumerate(found_theaters):
-            lines.append(f"  `{i}` — *{res['theater']['name']}* ({len(res['shows'])} shows)")
+        lines = [f"🕵️‍♂️ *Movie Intelligence Report for '{target_movie['name']}':*"]
         
-        lines.append("\n📝 *Send the number* to view these showtimes.")
+        if intel_report:
+            lines.append("\n*Future dates at THIS theater:*")
+            lines.extend(intel_report)
+            lines.append("*(Currently, the bot only supports booking for Today. You must book future dates manually on Paytm)*")
+            
+        if found_theaters:
+            self.smart_results = found_theaters
+            lines.append("\n*Playing TODAY at other theaters:*")
+            for i, res in enumerate(found_theaters):
+                lines.append(f"  `{i}` — *{res['theater']['name']}* ({len(res['shows'])} shows)")
+            lines.append("\n📝 *Send a number* to view showtimes at that theater, or `back` to abort.")
+            self.bot_state = "WAITING_SMART_THEATER"
+        else:
+            lines.append("\nNo other theaters are playing this today.")
+            self.bot_state = "WAITING_SHOWTIME"
+
         self.send("\n".join(lines))
-        self.bot_state = "WAITING_SMART_THEATER"
 
     def _handle_smart_theater(self, text):
         idx = int(text)

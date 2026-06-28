@@ -142,6 +142,35 @@ class SeatSelector:
         """)
         return movies
 
+    def bms_get_dates(self) -> list[dict]:
+        """Extract available date tabs."""
+        time.sleep(1)
+        return self.driver.execute_script("""
+            const dates = [];
+            document.querySelectorAll('a, button, div, li, span').forEach((el, i) => {
+                const text = el.textContent?.trim() || '';
+                const classes = (el.className || '').toLowerCase();
+                if (text.length > 2 && text.length < 15 && (text.includes('Today') || text.includes('Tomorrow') || text.includes('Tom') || /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/.test(text))) {
+                    if (el.tagName === 'A' || el.tagName === 'BUTTON' || el.tagName === 'LI' || classes.includes('date') || classes.includes('day')) {
+                        if (!dates.find(d => d.text === text) && el.getBoundingClientRect().width > 0) {
+                            dates.push({ index: dates.length, text: text, id: i });
+                        }
+                    }
+                }
+            });
+            return dates;
+        """)
+
+    def bms_click_date(self, date_id: int):
+        """Click a specific date tab using its DOM element index."""
+        self.driver.execute_script(f"""
+            const els = document.querySelectorAll('a, button, div, li, span');
+            if (els[{date_id}]) {{
+                els[{date_id}].click();
+            }}
+        """)
+        time.sleep(3)
+
     def bms_get_showtimes(self) -> list[dict]:
         """Extract showtimes from the current page."""
         time.sleep(3)
