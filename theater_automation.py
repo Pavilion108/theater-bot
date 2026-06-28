@@ -273,6 +273,8 @@ class TheaterBot:
             self.send("❌ Location not found.")
             return
 
+        self.current_lat = lat
+        self.current_lon = lon
         theaters = self.find_theaters(lat, lon)
         if not theaters:
             self.send("❌ No theaters found.")
@@ -382,8 +384,38 @@ class TheaterBot:
             if len(found_theaters) >= 3:
                 break # Stop early if we found a few good options
 
+        if not found_theaters and hasattr(self, 'current_lat'):
+            self.send(f"⚠️ Not found in the immediate area. Expanding search radius to 20km for '{target_movie['name']}'... please wait.")
+            try:
+                expanded_theaters = self.find_theaters(self.current_lat, self.current_lon, radius=20000)
+                # Filter out ones we already checked
+                checked_names = [t['name'] for t in theaters_to_scan] + [original_theater]
+                new_theaters = [t for t in expanded_theaters if t['name'] not in checked_names][:5]
+                
+                for t in new_theaters:
+                    try:
+                        self.selector.bms_open_theater(t['name'])
+                        movies = self.selector.bms_get_movies(self.selector.driver.current_url)
+                        matching_movie = next((m for m in movies if target_movie['name'].lower() in m['name'].lower() or m['name'].lower() in target_movie['name'].lower()), None)
+                        if matching_movie and 'url' in matching_movie:
+                            self.selector.driver.get(matching_movie['url'])
+                            shows = self.selector.bms_get_showtimes()
+                            if shows:
+                                found_theaters.append({
+                                    'theater': t,
+                                    'movie': matching_movie,
+                                    'shows': shows
+                                })
+                    except Exception as e:
+                        log.error(f"Expanded smart scan error for {t['name']}: {e}")
+                        
+                    if len(found_theaters) >= 3:
+                        break
+            except Exception as e:
+                log.error(f"Error during expanded search: {e}")
+
         if not found_theaters:
-            self.send(f"❌ I checked nearby theaters and couldn't find any showtimes for '{target_movie['name']}'.\n\n"
+            self.send(f"❌ I checked nearby and expanded theaters (20km radius) and couldn't find any showtimes for '{target_movie['name']}'.\n\n"
                       "Send `other` to look at different theaters manually, or `back` to choose a different movie.")
             self.bot_state = "WAITING_SHOWTIME" # Keeps them in the movie state so they can use 'back'
             return
