@@ -120,11 +120,24 @@ class TheaterBot:
     # Theater Search — Google Places API (preferred) or Overpass (free)
     # ──────────────────────────────────────────────────────────────────────
     def find_theaters(self, lat, lon, radius=None):
-        """Find theaters near coordinates. Uses Google Places if API key is set, else Overpass."""
+        """Find theaters near coordinates. Tries Google Places first, falls back to Overpass."""
         radius = radius or SEARCH_RADIUS_METERS
+        theaters = []
+
+        # Try Google Places first if key is set
         if GOOGLE_PLACES_API_KEY:
-            return self._search_google_places(lat, lon, radius)
-        return self._search_overpass(lat, lon, radius)
+            theaters = self._search_google_places(lat, lon, radius)
+            if theaters:
+                self.send(f"🗺 Found {len(theaters)} theaters via Google Places API")
+                return theaters
+            else:
+                self.send("⚠️ Google Places returned no results — trying OpenStreetMap...")
+
+        # Fallback to Overpass (or primary if no Google key)
+        theaters = self._search_overpass(lat, lon, radius)
+        if theaters:
+            self.send(f"🗺 Found {len(theaters)} theaters via OpenStreetMap")
+        return theaters
 
     @staticmethod
     def _search_google_places(lat, lon, radius):
@@ -139,6 +152,14 @@ class TheaterBot:
         try:
             resp = requests.get(url, params=params, timeout=15)
             data = resp.json()
+
+            # Check for API errors
+            status = data.get("status", "UNKNOWN")
+            if status != "OK" and status != "ZERO_RESULTS":
+                log.error(f"Google Places API returned status: {status}")
+                log.error(f"Error message: {data.get('error_message', 'none')}")
+                return []
+
             theaters = []
             for place in data.get("results", []):
                 theaters.append({
@@ -147,7 +168,7 @@ class TheaterBot:
                     "lon": place["geometry"]["location"]["lng"],
                     "address": place.get("vicinity", ""),
                     "rating": place.get("rating", "N/A"),
-                    "website": None,  # Requires a Details API call
+                    "website": None,
                     "source": "google_places",
                 })
             return theaters
