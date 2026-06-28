@@ -38,17 +38,30 @@ class SeatSelector:
 
         self.playwright = await async_playwright().start()
 
-        # Launch Chromium with stealth settings
-        self.browser = await self.playwright.chromium.launch(
-            headless=True,
-            args=[
+        # Detect system Chromium (for Alpine Linux compatibility)
+        executable_path = None
+        for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"]:
+            if os.path.exists(path):
+                executable_path = path
+                break
+                
+        launch_args = {
+            "headless": True,
+            "args": [
                 "--no-sandbox",
                 "--disable-blink-features=AutomationControlled",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--window-size=1920,1080",
-            ],
-        )
+            ]
+        }
+        
+        if executable_path:
+            launch_args["executable_path"] = executable_path
+            log.info(f"Using system Chromium at {executable_path}")
+
+        # Launch Chromium with stealth settings
+        self.browser = await self.playwright.chromium.launch(**launch_args)
 
         # Create context with realistic fingerprint
         self.context = await self.browser.new_context(
