@@ -1,0 +1,15 @@
+services:
+  theater-bot:
+    build: .
+    container_name: theater-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Alternative: set env vars directly (useful in Codespaces)
+    # environment:
+    #   - TELEGRAM_BOT_TOKEN=your_token_here
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
