@@ -7,14 +7,25 @@
 
 set -e
 
+# Auto-detect python and pip commands
+if command -v python3 &>/dev/null; then
+    PY=python3
+elif command -v python &>/dev/null; then
+    PY=python
+else
+    echo "❌ Python not found! Please install Python 3."
+    exit 1
+fi
+
 echo "=================================================="
 echo "🎬 Theater Bot — Setup & Launch"
 echo "=================================================="
+echo "   Using: $($PY --version)"
 
 # Step 1: Install dependencies
 echo ""
 echo "📦 Installing Python dependencies..."
-pip install -r requirements.txt --quiet
+$PY -m pip install -r requirements.txt --quiet
 echo "   ✅ Dependencies installed!"
 
 # Step 2: Check for .env file
@@ -48,4 +59,4 @@ echo "   Press Ctrl+C to stop."
 echo "=================================================="
 echo ""
 
-python theater_automation.py
+$PY theater_automation.py
