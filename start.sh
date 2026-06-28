@@ -38,6 +38,8 @@ source "$VENV_DIR/bin/activate"
 # Step 3: Install dependencies
 echo "📦 Installing Python dependencies..."
 pip install -r requirements.txt --quiet
+echo "📦 Installing Playwright browsers..."
+playwright install chromium --with-deps || playwright install chromium
 echo "   ✅ Dependencies installed!"
 
 # Step 4: Check for .env file

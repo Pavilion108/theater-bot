@@ -1,15 +1,18 @@
-# Lightweight Python image
-FROM python:3.12-slim
+# Use official Playwright Python image
+FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies first (caching layer)
+# Install Python dependencies first (caching layer)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install Chromium
+RUN playwright install chromium
+
 # Copy application code
-COPY theater_automation.py .
+COPY . .
 
 # Don't buffer Python output (important for Docker logs)
 ENV PYTHONUNBUFFERED=1
