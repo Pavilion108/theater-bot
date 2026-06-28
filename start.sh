@@ -27,8 +27,24 @@ echo ""
 echo "📦 Checking for pip..."
 if ! $PY -m pip --version &>/dev/null; then
     echo "   ⚠️  pip not found — installing it now..."
-    $PY -m ensurepip --upgrade 2>/dev/null || sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip
-    echo "   ✅ pip installed!"
+    # Method 1: ensurepip
+    if $PY -m ensurepip --upgrade 2>/dev/null; then
+        echo "   ✅ pip installed via ensurepip!"
+    else
+        # Method 2: Download get-pip.py (works everywhere)
+        echo "   Downloading get-pip.py..."
+        curl -sSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+        $PY /tmp/get-pip.py --quiet
+        rm -f /tmp/get-pip.py
+        echo "   ✅ pip installed via get-pip.py!"
+    fi
+fi
+
+# Verify pip works
+if ! $PY -m pip --version &>/dev/null; then
+    echo "   ❌ Failed to install pip. Please run manually:"
+    echo "      curl -sSL https://bootstrap.pypa.io/get-pip.py | python3"
+    exit 1
 fi
 
 # Step 2: Install dependencies
