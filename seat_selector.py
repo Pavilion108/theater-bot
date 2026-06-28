@@ -99,9 +99,8 @@ class SeatSelector:
         city_slug = city.lower().replace(" ", "") if city else "mumbai"
         query = urllib.parse.quote(theater_name)
         
-        # Using a generic Google search that redirects to Paytm to find the exact theater page
-        # This is more reliable than guessing Paytm's internal URL slugs
-        url = f"https://www.google.com/search?q=site:paytm.com/movies+{query}+{city_slug}"
+        # Using DuckDuckGo search that redirects to Paytm to avoid Google's login popups
+        url = f"https://duckduckgo.com/html/?q=site:paytm.com/movies+{query}+{city_slug}"
         self.driver.get(url)
         time.sleep(3)
         
