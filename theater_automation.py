@@ -333,7 +333,10 @@ class TheaterBot:
         
         shows = self.selector.bms_get_showtimes()
         if not shows:
-            self.send("❌ No showtimes found. Send `/restart`.")
+            self.send(f"❌ *No showtimes found* for '{movie['name']}' at this theater today.\n\n"
+                      "🔁 *Try another nearby theater:*")
+            self.bot_state = "WAITING_THEATER"
+            self._resend_theaters()
             return
             
         self.showtimes_cache = shows
