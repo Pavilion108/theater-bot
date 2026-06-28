@@ -7,7 +7,7 @@
 
 set -e
 
-# Auto-detect python and pip commands
+# Auto-detect python command
 if command -v python3 &>/dev/null; then
     PY=python3
 elif command -v python &>/dev/null; then
@@ -22,37 +22,25 @@ echo "🎬 Theater Bot — Setup & Launch"
 echo "=================================================="
 echo "   Using: $($PY --version)"
 
-# Step 1: Ensure pip is available
-echo ""
-echo "📦 Checking for pip..."
-if ! $PY -m pip --version &>/dev/null; then
-    echo "   ⚠️  pip not found — installing it now..."
-    # Method 1: ensurepip
-    if $PY -m ensurepip --upgrade 2>/dev/null; then
-        echo "   ✅ pip installed via ensurepip!"
-    else
-        # Method 2: Download get-pip.py (works everywhere)
-        echo "   Downloading get-pip.py..."
-        curl -sSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
-        $PY /tmp/get-pip.py --quiet
-        rm -f /tmp/get-pip.py
-        echo "   ✅ pip installed via get-pip.py!"
-    fi
+# Step 1: Create virtual environment if it doesn't exist
+VENV_DIR=".venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo ""
+    echo "📦 Creating virtual environment..."
+    $PY -m venv "$VENV_DIR"
+    echo "   ✅ Virtual environment created!"
 fi
 
-# Verify pip works
-if ! $PY -m pip --version &>/dev/null; then
-    echo "   ❌ Failed to install pip. Please run manually:"
-    echo "      curl -sSL https://bootstrap.pypa.io/get-pip.py | python3"
-    exit 1
-fi
+# Step 2: Activate the venv
+echo "📦 Activating virtual environment..."
+source "$VENV_DIR/bin/activate"
 
-# Step 2: Install dependencies
+# Step 3: Install dependencies
 echo "📦 Installing Python dependencies..."
-$PY -m pip install -r requirements.txt --quiet --break-system-packages 2>/dev/null || $PY -m pip install -r requirements.txt --quiet
+pip install -r requirements.txt --quiet
 echo "   ✅ Dependencies installed!"
 
-# Step 2: Check for .env file
+# Step 4: Check for .env file
 if [ ! -f .env ]; then
     echo ""
     echo "⚙️  Creating .env from template..."
@@ -63,7 +51,7 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Step 3: Validate token is set
+# Step 5: Validate token is set
 TOKEN=$(grep -oP 'TELEGRAM_BOT_TOKEN="\K[^"]+' .env 2>/dev/null || grep -oP 'TELEGRAM_BOT_TOKEN=\K.+' .env 2>/dev/null || echo "")
 if [ -z "$TOKEN" ] || [ "$TOKEN" = "your_telegram_bot_token_here" ]; then
     echo ""
@@ -75,7 +63,7 @@ fi
 
 echo "   ✅ .env file found and token is set!"
 
-# Step 4: Launch the bot
+# Step 6: Launch the bot
 echo ""
 echo "🚀 Starting Theater Bot..."
 echo "   Send any message to your Telegram bot to begin!"
@@ -83,4 +71,4 @@ echo "   Press Ctrl+C to stop."
 echo "=================================================="
 echo ""
 
-$PY theater_automation.py
+python theater_automation.py
