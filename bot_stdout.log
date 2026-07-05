@@ -1,0 +1,38 @@
+2026-07-04 23:31:16 [INFO] ============================================================
+2026-07-04 23:31:16 [INFO] 🎬 Theater Automator v3.0 (Playwright)
+2026-07-04 23:31:16 [INFO] ============================================================
+2026-07-04 23:31:16 [INFO] Bot is running! Waiting for Telegram messages.
+2026-07-04 23:31:17 [INFO] 📩 [868003810] Hey
+2026-07-04 23:31:18 [INFO] 📩 [868003810] Hey
+2026-07-04 23:31:37 [INFO] 📩 [868003810] Hey
+2026-07-04 23:31:53 [INFO] 📩 [868003810] Hey
+2026-07-04 23:32:12 [INFO] 📩 [868003810] Hii
+2026-07-04 23:32:14 [WARNING] Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ReadTimeoutError("HTTPSConnectionPool(host='nominatim.openstreetmap.org', port=443): Read timed out. (read timeout=1)")': /search?q=Hii&format=json&limit=1
+2026-07-04 23:32:29 [INFO] 📩 [868003810] Agent
+2026-07-04 23:32:29 [ERROR] Error handling state WAITING_THEATER: invalid literal for int() with base 10: 'Agent'
+Traceback (most recent call last):
+  File "C:\Users\homep\.gitlab\theater-bot\theater_automation.py", line 262, in handle_message
+    self._handle_theater(text_stripped)
+  File "C:\Users\homep\.gitlab\theater-bot\theater_automation.py", line 303, in _handle_theater
+    idx = int(text)
+ValueError: invalid literal for int() with base 10: 'Agent'
+2026-07-04 23:32:30 [INFO] 📩 [868003810] Hey
+2026-07-04 23:32:30 [ERROR] Error handling state WAITING_THEATER: invalid literal for int() with base 10: 'Hey'
+Traceback (most recent call last):
+  File "C:\Users\homep\.gitlab\theater-bot\theater_automation.py", line 262, in handle_message
+    self._handle_theater(text_stripped)
+  File "C:\Users\homep\.gitlab\theater-bot\theater_automation.py", line 303, in _handle_theater
+    idx = int(text)
+ValueError: invalid literal for int() with base 10: 'Hey'
+2026-07-04 23:33:09 [INFO] 📩 [868003810] 1
+2026-07-04 23:33:19 [INFO] 🎭 Stealth browser started successfully
+2026-07-04 23:33:28 [INFO] 📸 Screenshot saved: C:\Users\homep\.gitlab\theater-bot\data\screenshots\paytm_theaters_1783188208.png
+2026-07-04 23:34:42 [INFO] 📩 [868003810] 1
+2026-07-04 23:34:58 [INFO] 📸 Screenshot saved: C:\Users\homep\.gitlab\theater-bot\data\screenshots\paytm_theaters_1783188298.png
+2026-07-04 23:37:06 [INFO] 📩 [868003810] /restart
+2026-07-04 23:37:09 [INFO] Browser closed
+2026-07-04 23:37:09 [INFO] Bot state reset.
+2026-07-04 23:37:25 [INFO] 📩 [868003810] Seawoods
+2026-07-04 23:37:43 [INFO] 📩 [868003810] 4
+2026-07-04 23:37:45 [INFO] 🎭 Stealth browser started successfully
+2026-07-04 23:37:54 [INFO] 📸 Screenshot saved: C:\Users\homep\.gitlab\theater-bot\data\screenshots\paytm_theaters_1783188473.png

@@ -18,6 +18,8 @@ from geopy.geocoders import Nominatim
 
 from seat_selector import SeatSelector
 from cookie_manager import save_cookies, get_cookie_export_snippet
+from excel_logger import log_media_to_excel
+from media_intel import download_telegram_file, analyze_media
 
 # Try to load .env file
 try:
@@ -220,6 +222,15 @@ class TheaterBot:
             self.stop_event.set()
             return
             
+        if text_stripped.lower() in ("hey", "hi", "hello", "/menu", "menu", "start"):
+            self.send(
+                "👋 Hello! I am your Smart Theater Automator.\n\n"
+                "• To book tickets, reply with a *Location* (e.g., `Mumbai`).\n"
+                "• Send me any *Photo or Video* to auto-extract its data into Excel.\n"
+                "• Type `/help` for detailed instructions."
+            )
+            return
+            
         if text_stripped.lower() == "/restart":
             self.reset()
             self.send("🔄 *Bot reset!* Start fresh by sending a location.")
@@ -285,6 +296,37 @@ class TheaterBot:
         except Exception as e:
             log.error(f"Error handling state {self.bot_state}: {e}", exc_info=True)
             self.send(f"❌ Error occurred: {e}\nSend `/restart` to try again.")
+
+    def _handle_media(self, chat_id, msg):
+        self.chat_id = chat_id
+        self.send("📸 Media received! Downloading and processing data...")
+        
+        try:
+            file_id = None
+            file_type = "unknown"
+            if "photo" in msg:
+                file_id = msg["photo"][-1]["file_id"]
+                file_type = "image"
+            elif "video" in msg:
+                file_id = msg["video"]["file_id"]
+                file_type = "video"
+            elif "document" in msg:
+                file_id = msg["document"]["file_id"]
+                file_type = "document"
+                
+            if not file_id: return
+            
+            save_path = f"data/media/{file_id}.tmp"
+            downloaded_path = download_telegram_file(file_id, TELEGRAM_BOT_TOKEN, save_path)
+            
+            if downloaded_path:
+                intel = analyze_media(downloaded_path, file_type)
+                excel_file = log_media_to_excel(chat_id, intel)
+                
+                self.send(f"✅ Data extracted and logged to Excel!\n\n*Summary:* {intel['summary']}\n*Entities:* {intel['entities']}")
+        except Exception as e:
+            log.error(f"Error handling media: {e}")
+            self.send(f"❌ Failed to process media: {e}")
 
     def _handle_location(self, text):
         self.send(f"🔍 Searching theaters near *{text}*...")
@@ -539,10 +581,14 @@ class TheaterBot:
                     chat_id = msg.get("chat", {}).get("id")
                     text = msg.get("text", "")
                     
-                    if chat_id and text:
-                        log.info(f"📩 [{chat_id}] {text}")
-                        self.handle_message(chat_id, text)
-                        
+                    if chat_id:
+                        if text:
+                            log.info(f"📩 [{chat_id}] {text}")
+                            threading.Thread(target=self.handle_message, args=(chat_id, text), daemon=True).start()
+                        elif "photo" in msg or "video" in msg or "document" in msg:
+                            log.info(f"📩 [{chat_id}] [MEDIA ATTACHMENT]")
+                            threading.Thread(target=self._handle_media, args=(chat_id, msg), daemon=True).start()
+                            
             except requests.exceptions.Timeout:
                 continue
             except Exception as e:
