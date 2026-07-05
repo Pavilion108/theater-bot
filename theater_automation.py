@@ -209,7 +209,7 @@ class TheaterBot:
     def handle_message(self, current_chat_id, text):
         if not self.chat_id:
             self.chat_id = current_chat_id
-            self.send("✅ *Link established!*\n\nSend a location (e.g. `Nerul`) to start.\nSend `/cookies` to learn how to log in.")
+            self.send("✅ *Link established!*\n\nWelcome to your Personal Theater Concierge 🍿\nSend a location (e.g. `Nerul` or `Mumbai`) to start finding theaters.\n\nType `/help` at any time to see how this works.")
             return
 
         text_stripped = text.strip()
@@ -222,7 +222,19 @@ class TheaterBot:
             
         if text_stripped.lower() == "/restart":
             self.reset()
-            self.send("🔄 *Bot reset!* Send a location.")
+            self.send("🔄 *Bot reset!* Start fresh by sending a location.")
+            return
+            
+        if text_stripped.lower() == "/help":
+            self.send(
+                "🤖 *How to use the Theater Bot:*\n"
+                "1️⃣ *Location:* Type any city or neighborhood to find nearby theaters.\n"
+                "2️⃣ *Theater:* Reply with the number of the theater you want to check.\n"
+                "3️⃣ *Movie & Time:* Pick your movie and showtime from the lists provided.\n"
+                "4️⃣ *Seats:* Tell me how many tickets you want. I will auto-select the best center seats!\n\n"
+                "⚠️ *Note:* To hold seats, you must log in using your browser cookies. Send `/cookies` for instructions on how to do that.\n"
+                "You can also say `back` or `other` during the process to change your selection."
+            )
             return
 
         if text_stripped.lower() == "/cookies":
