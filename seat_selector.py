@@ -11,9 +11,7 @@ import time
 from pathlib import Path
 import urllib.parse
 
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 
 from cookie_manager import load_cookies
@@ -35,16 +33,13 @@ class SeatSelector:
         if self._started:
             return
 
-        options = Options()
+        options = uc.ChromeOptions()
         # Paytm is less strict than BMS, but we still try to be stealthy
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
         
         # User agent spoofing
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -60,13 +55,19 @@ class SeatSelector:
             options.binary_location = executable_path
             log.info(f"Using system Chromium at {executable_path}")
 
-        service = Service()
+        driver_executable_path = None
         for path in ["/usr/bin/chromedriver", "/usr/lib/chromium/chromedriver"]:
             if os.path.exists(path):
-                service = Service(executable_path=path)
+                driver_executable_path = path
                 break
 
-        self.driver = webdriver.Chrome(service=service, options=options)
+        self.driver = uc.Chrome(
+            options=options,
+            browser_executable_path=executable_path,
+            driver_executable_path=driver_executable_path,
+            headless=True,
+            use_subprocess=True
+        )
         
         # Additional stealth via CDP
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
@@ -76,7 +77,7 @@ class SeatSelector:
         })
 
         self._started = True
-        log.info("🎭 Stealth browser started successfully")
+        log.info("🎭 Stealth browser (undetected_chromedriver) started successfully")
 
     def stop(self):
         """Close the browser."""
