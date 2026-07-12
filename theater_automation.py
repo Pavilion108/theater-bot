@@ -646,7 +646,7 @@ class TheaterBot:
 
 class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/dump":
+        if "/dump" in self.path:
             try:
                 with open("gemini_error_dump.html", "rb") as f:
                     content = f.read()
