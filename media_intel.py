@@ -44,7 +44,8 @@ def analyze_media(file_path, file_type):
         }
         
         # Log to Airtable
-        log_to_airtable(result_data)
+        airtable_success, airtable_msg = log_to_airtable(result_data)
+        result_data["airtable_status"] = airtable_msg
         
         return result_data
     except Exception as e:

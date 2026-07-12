@@ -44,16 +44,29 @@ def log_to_airtable(data):
                     "Entities": data.get("entities", "")
                 }
             }
-        ]
+        ],
+        "typecast": True  # Helps with automatic type conversion
     }
     
     try:
         resp = requests.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         log.info("Successfully synced media intel to Airtable!")
-        return True
-    except Exception as e:
-        log.error(f"Failed to log to Airtable: {e}")
+        return True, "Data successfully logged to Airtable."
+    except requests.exceptions.RequestException as e:
+        error_msg = str(e)
         if hasattr(e, 'response') and e.response is not None:
-            log.error(f"Response: {e.response.text}")
-        return False
+            try:
+                error_data = e.response.json()
+                if "error" in error_data:
+                    error_obj = error_data["error"]
+                    if isinstance(error_obj, dict) and "message" in error_obj:
+                        error_msg = f"{error_obj.get('type')}: {error_obj.get('message')}"
+                    else:
+                        error_msg = str(error_obj)
+            except Exception:
+                error_msg = e.response.text
+        
+        log.error(f"Failed to log to Airtable: {error_msg}")
+        return False, f"Airtable API Error: {error_msg}"
+

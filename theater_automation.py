@@ -424,7 +424,14 @@ class TheaterBot:
             if downloaded_path:
                 intel = analyze_media(downloaded_path, file_type)
                 
-                self.send(f"✅ Data extracted and logged to Airtable!\n\n*Summary:* {intel['summary']}\n*Entities:* {intel['entities']}")
+                # Check airtable status
+                airtable_status = intel.get("airtable_status", "Not synced")
+                if "Error" in airtable_status:
+                    status_emoji = "❌"
+                else:
+                    status_emoji = "✅"
+                
+                self.send(f"🤖 *Extraction Complete!*\n\n*Summary:* {intel['summary']}\n\n*Entities:* {intel['entities']}\n\n{status_emoji} *Airtable:* {airtable_status}")
         except Exception as e:
             log.error(f"Error handling media: {e}")
             self.send(f"❌ Failed to process media: {e}")
