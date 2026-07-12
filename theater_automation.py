@@ -18,8 +18,8 @@ from geopy.geocoders import Nominatim
 
 from seat_selector import SeatSelector
 from cookie_manager import save_cookies, get_cookie_export_snippet
-from excel_logger import log_media_to_excel
-from media_intel import download_telegram_file, analyze_media
+from excel_logger import log_media_to_excel, get_excel_path
+from media_intel import download_telegram_file, analyze_media, generate_text_summary
 
 # Try to load .env file
 try:
@@ -323,7 +323,7 @@ class TheaterBot:
                 intel = analyze_media(downloaded_path, file_type)
                 excel_file = log_media_to_excel(chat_id, intel)
                 
-                self.send(f"✅ Data extracted and logged to Excel!\n\n*Summary:* {intel['summary']}\n*Entities:* {intel['entities']}")
+                self.send(f"✅ Data extracted and logged to Excel & Airtable!\n\n*Summary:* {intel['summary']}\n*Entities:* {intel['entities']}")
         except Exception as e:
             log.error(f"Error handling media: {e}")
             self.send(f"❌ Failed to process media: {e}")
@@ -558,11 +558,53 @@ class TheaterBot:
         self.bot_state = "MONITORING"
         threading.Thread(target=self._monitor_loop, daemon=True).start()
 
+    def _daily_summary_loop(self):
+        """Checks time every minute and generates daily summary at 23:50."""
+        while not self.stop_event.is_set():
+            now = datetime.now()
+            if now.hour == 23 and now.minute == 50:
+                log.info("Generating End of Day Summary...")
+                self._generate_daily_summary()
+                time.sleep(65)
+            else:
+                for _ in range(60):
+                    if self.stop_event.is_set(): return
+                    time.sleep(1)
+
+    def _generate_daily_summary(self):
+        if not self.chat_id: return
+        excel_file = get_excel_path(self.chat_id)
+        if not os.path.exists(excel_file):
+            return
+            
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(excel_file)
+            ws = wb.active
+            today = datetime.now().strftime('%Y-%m-%d')
+            today_logs = []
+            
+            for row in list(ws.iter_rows(values_only=True))[1:]: # Skip header
+                if row[0] and str(row[0]).startswith(today):
+                    today_logs.append(f"Time: {row[0]}, Type: {row[2]}\nSummary: {row[3]}\nEntities: {row[4]}")
+            
+            if not today_logs:
+                return # No logs today
+                
+            prompt = f"Here are the logs of media processed today ({today}):\n\n" + "\n---\n".join(today_logs) + "\n\nPlease write a concise executive summary of all the information captured today."
+            
+            summary = generate_text_summary(prompt)
+            self.send(f"📊 *End of Day Executive Summary*\n\n{summary}")
+        except Exception as e:
+            log.error(f"Failed to generate daily summary: {e}")
+
     def run(self):
         log.info("=" * 60)
         log.info("🎬 Theater Automator v3.0 (Playwright)")
         log.info("=" * 60)
         log.info("Bot is running! Waiting for Telegram messages.")
+
+        threading.Thread(target=self._daily_summary_loop, daemon=True).start()
 
         offset = None
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"

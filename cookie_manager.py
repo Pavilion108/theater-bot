@@ -61,11 +61,26 @@ def save_cookies(cookies_json_str: str) -> tuple[bool, str]:
 
         if not normalized:
             return False, "No valid cookies found in the data."
+        # Merge with existing cookies
+        existing_cookies = []
+        if COOKIES_FILE.exists():
+            try:
+                with open(COOKIES_FILE, "r") as f:
+                    existing_cookies = json.load(f)
+            except:
+                pass
+                
+        # Update logic: keep old cookies unless we have a new one with the same name & domain
+        merged = {f"{c['name']}:{c['domain']}": c for c in existing_cookies}
+        for c in normalized:
+            merged[f"{c['name']}:{c['domain']}"] = c
+            
+        final_cookies = list(merged.values())
 
         # Save to file
         COOKIES_DIR.mkdir(parents=True, exist_ok=True)
         with open(COOKIES_FILE, "w") as f:
-            json.dump(normalized, f, indent=2)
+            json.dump(final_cookies, f, indent=2)
 
         # Categorize cookies by domain
         domains = set(c["domain"] for c in normalized)
@@ -109,14 +124,15 @@ def get_cookie_export_snippet() -> str:
     """Return the JavaScript snippet users should run in Chrome DevTools."""
     return (
         "📋 *Export your cookies in 3 steps:*\n\n"
-        "*Step 1:* Open Paytm Movies (paytm.com/movies) in Chrome and make sure you're logged in\n\n"
+        "*Step 1:* Open either Paytm (paytm.com/movies) OR Gemini (gemini.google.com) and make sure you're logged in\n\n"
         "*Step 2:* Press `F12` → click the *Console* tab → paste this and press Enter:\n\n"
         "```\n"
         "copy(JSON.stringify(document.cookie.split('; ').map(c => {"
         "const [n,...v] = c.split('=');"
-        "return {name:n, value:v.join('='), domain:'.paytm.com', path:'/'}"
+        "return {name:n, value:v.join('='), domain:window.location.hostname, path:'/'}"
         "})))\n"
         "```\n\n"
         "*Step 3:* The cookies are now in your clipboard. Send them here as:\n"
-        "`/cookies [paste here]`"
+        "`/cookies [paste here]`\n\n"
+        "*(Note: You can do this once for Paytm and once for Gemini. The bot will automatically save and combine them!)*"
     )

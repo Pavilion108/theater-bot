@@ -3,10 +3,17 @@ import openpyxl
 from openpyxl import Workbook
 import datetime
 
+def get_excel_path(chat_id):
+    """Returns the path for the excel file, prioritizing Google Drive if configured."""
+    base_dir = os.getenv("GOOGLE_DRIVE_PATH")
+    if not base_dir or not os.path.exists(base_dir):
+        base_dir = 'data/excel'
+    os.makedirs(base_dir, exist_ok=True)
+    return os.path.join(base_dir, f'media_log_{chat_id}.xlsx')
+
 def log_media_to_excel(chat_id, data):
     """Logs extracted media info to an Excel file per chat ID."""
-    os.makedirs('data/excel', exist_ok=True)
-    filename = f'data/excel/media_log_{chat_id}.xlsx'
+    filename = get_excel_path(chat_id)
     
     headers = ['Timestamp', 'Filename', 'File Type', 'Extracted Summary', 'Key Entities']
     
