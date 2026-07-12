@@ -321,9 +321,8 @@ class TheaterBot:
             
             if downloaded_path:
                 intel = analyze_media(downloaded_path, file_type)
-                excel_file = log_media_to_excel(chat_id, intel)
                 
-                self.send(f"✅ Data extracted and logged to Excel & Airtable!\n\n*Summary:* {intel['summary']}\n*Entities:* {intel['entities']}")
+                self.send(f"✅ Data extracted and logged to Airtable!\n\n*Summary:* {intel['summary']}\n*Entities:* {intel['entities']}")
         except Exception as e:
             log.error(f"Error handling media: {e}")
             self.send(f"❌ Failed to process media: {e}")
