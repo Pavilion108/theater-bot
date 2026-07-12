@@ -51,7 +51,8 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
     kwargs = {
         "options": options,
         "headless": True,
-        "use_subprocess": True
+        "use_subprocess": True,
+        "version_main": 123
     }
     if executable_path:
         kwargs["browser_executable_path"] = executable_path
