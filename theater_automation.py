@@ -254,10 +254,17 @@ class TheaterBot:
             self.send(get_cookie_export_snippet())
             return
             
-        if text_stripped.startswith("/cookies ") or (self.bot_state == "WAITING_LOCATION" and text_stripped.startswith("[") and text_stripped.endswith("]")):
-            json_str = text_stripped.replace("/cookies ", "").strip()
-            success, msg = save_cookies(json_str)
-            self.send(msg)
+        if text_stripped.lower().startswith("/cookies") or (self.bot_state == "WAITING_LOCATION" and text_stripped.startswith("[") and text_stripped.endswith("]")):
+            # Remove the literal '/cookies' part, regardless of spaces or newlines
+            json_str = text_stripped
+            if json_str.lower().startswith("/cookies"):
+                json_str = json_str[8:].strip()
+                
+            if json_str:
+                success, msg = save_cookies(json_str)
+                self.send(msg)
+            else:
+                self.send(get_cookie_export_snippet())
             return
 
         try:
