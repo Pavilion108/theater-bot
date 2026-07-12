@@ -296,14 +296,18 @@ class TheaterBot:
             nvidia_key = os.getenv("NVIDIA_API_KEY", "")
             airtable_key = os.getenv("AIRTABLE_API_KEY", "")
             
+            or_status = "✅ Set" if openrouter_key else "❌ Missing"
+            nv_status = "✅ Set" if nvidia_key else "❌ Missing"
+            at_status = "✅ Connected" if airtable_key else "❌ Not set"
+            
             self.send(
                 "📊 *Bot Status Dashboard:*\n\n"
                 f"⏱ *Uptime:* `{hours}h {minutes}m {seconds}s`\n"
                 f"🧠 *State:* `{self.bot_state}`\n"
                 f"🍪 *Cookies:* {cookie_status} ({cookie_count} cookies)\n"
-                f"🔑 *OpenRouter API:* {'\u2705 Set' if openrouter_key else '\u274c Missing'}\n"
-                f"🔑 *NVIDIA API:* {'\u2705 Set' if nvidia_key else '\u274c Missing'}\n"
-                f"📝 *Airtable:* {'\u2705 Connected' if airtable_key else '\u274c Not set'}\n\n"
+                f"🔑 *OpenRouter API:* {or_status}\n"
+                f"🔑 *NVIDIA API:* {nv_status}\n"
+                f"📝 *Airtable:* {at_status}\n\n"
                 f"🎬 *Cached Theaters:* {len(self.theaters_cache)}\n"
                 f"🎬 *Cached Movies:* {len(self.movies_cache)}\n"
                 f"🎬 *Cached Showtimes:* {len(self.showtimes_cache)}"
