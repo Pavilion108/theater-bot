@@ -32,7 +32,12 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
     
     # Try finding system chromium first for linux compatibility
     executable_path = None
-    for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"]:
+    
+    # Also search Playwright's internal directory if present in Docker
+    import glob
+    pw_paths = glob.glob("/ms-playwright/chromium-*/chrome-linux/chrome")
+    
+    for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"] + pw_paths:
         if os.path.exists(path):
             executable_path = path
             break

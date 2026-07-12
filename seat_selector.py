@@ -46,7 +46,11 @@ class SeatSelector:
 
         # Detect system Chromium (for Alpine Linux compatibility)
         executable_path = None
-        for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"]:
+        
+        import glob
+        pw_paths = glob.glob("/ms-playwright/chromium-*/chrome-linux/chrome")
+        
+        for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"] + pw_paths:
             if os.path.exists(path):
                 executable_path = path
                 break
