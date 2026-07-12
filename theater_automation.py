@@ -646,6 +646,20 @@ class TheaterBot:
 
 class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/dump":
+            try:
+                with open("gemini_error_dump.html", "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(content)
+            except Exception as e:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"No dump found.")
+            return
+
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
