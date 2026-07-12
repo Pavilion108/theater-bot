@@ -75,9 +75,19 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
         time.sleep(5)
         
         if not has_cookies:
-            # Maybe check if we are on login screen
+            # Check if we are on login screen
             if "signin" in driver.current_url.lower():
                 return "Error: Gemini Web requires authentication. Please export your google.com cookies using /cookies command."
+                
+        # Google now allows unauthenticated users on /app, but blocks image uploads!
+        # We must check if the "Sign in" button is on the page.
+        try:
+            time.sleep(2)
+            sign_in_text = driver.find_elements(By.XPATH, "//*[contains(text(), 'Sign in to try tools') or text()='Sign in']")
+            if sign_in_text:
+                return "Error: Gemini Web requires authentication to upload images. Your cookies were wiped during the server restart! Please export your google.com cookies and send them using the /cookies command again."
+        except:
+            pass
         
         # Try to find file input and upload
         try:
