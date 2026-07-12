@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Chromium
-RUN playwright install chromium
+# (Handled by undetected-chromedriver internally)
 
 # Copy application code
 COPY . .
