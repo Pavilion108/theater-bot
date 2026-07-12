@@ -12,6 +12,8 @@ import signal
 import logging
 import threading
 from datetime import datetime, timezone
+import http.server
+import socketserver
 
 import requests
 from geopy.geocoders import Nominatim
@@ -642,7 +644,26 @@ class TheaterBot:
         except:
             pass
 
+class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+def start_dummy_server():
+    port = int(os.getenv("PORT", 10000))
+    try:
+        with socketserver.TCPServer(("", port), HealthCheckHandler) as httpd:
+            log.info(f"Health check server started on port {port}")
+            httpd.serve_forever()
+    except Exception as e:
+        log.error(f"Failed to start health check server: {e}")
+
 def main():
+    # Start the dummy server in a background thread for Render
+    threading.Thread(target=start_dummy_server, daemon=True).start()
+    
     bot = TheaterBot()
     def handler(signum, frame):
         bot.stop_event.set()
