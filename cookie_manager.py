@@ -24,13 +24,31 @@ def save_cookies(cookies_json_str: str) -> tuple[bool, str]:
     """
     try:
         cookies = json.loads(cookies_json_str)
-        
         if isinstance(cookies, dict):
-            # If it's a single cookie, wrap in list
             cookies = [cookies]
-        
         if not isinstance(cookies, list):
             return False, "Invalid format — expected a JSON array of cookies."
+    except json.JSONDecodeError:
+        # Fallback: Assume it's a raw cookie string from Network tab
+        # e.g., "__Secure-1PSID=abc; NID=123;"
+        raw_cookies = cookies_json_str.strip()
+        if "=" not in raw_cookies:
+            return False, "❌ Invalid format. Please provide valid JSON or a raw cookie string (key=value;)."
+        
+        cookies = []
+        for pair in raw_cookies.split(";"):
+            pair = pair.strip()
+            if not pair or "=" not in pair:
+                continue
+            name, value = pair.split("=", 1)
+            cookies.append({
+                "name": name.strip(),
+                "value": value.strip(),
+                "domain": ".google.com",
+                "path": "/"
+            })
+
+    try:
 
         # Normalize cookie format for Playwright
         normalized = []
@@ -91,8 +109,6 @@ def save_cookies(cookies_json_str: str) -> tuple[bool, str]:
             f"The bot will now browse as your logged-in session!"
         )
 
-    except json.JSONDecodeError:
-        return False, "❌ Invalid JSON format. Please copy the exact output from the browser snippet."
     except Exception as e:
         return False, f"❌ Error saving cookies: {e}"
 
@@ -124,9 +140,18 @@ def get_cookie_export_snippet() -> str:
     """Return the JavaScript snippet users should run in Chrome DevTools."""
     return (
         "📋 *Export your cookies correctly:*\n\n"
-        "*Step 1:* Install the 'EditThisCookie' extension for Chrome.\n\n"
-        "*Step 2:* Open gemini.google.com and make sure you're logged in.\n\n"
-        "*Step 3:* Click the EditThisCookie icon in your browser toolbar, then click the 'Export' button (the arrow pointing out the door icon).\n\n"
-        "*Step 4:* Your cookies are now copied to your clipboard. Send them here exactly as:\n"
-        "`/cookies [paste here]`"
+        "Since Google uses strict security, Javascript cannot read your login cookies. You have two options:\n\n"
+        "**Option 1: Using EditThisCookie Extension (Easy)**\n"
+        "1. Install the 'EditThisCookie' extension for Chrome.\n"
+        "2. Open gemini.google.com and make sure you're logged in.\n"
+        "3. Click the extension icon, then click the 'Export' button (arrow pointing out the door).\n"
+        "4. Send it to the bot exactly as: `/cookies [paste here]`\n\n"
+        "**Option 2: Using Developer Tools (No Extensions)**\n"
+        "1. Open gemini.google.com and log in.\n"
+        "2. Press F12 to open Developer Tools.\n"
+        "3. Go to the **Network** tab and refresh the page.\n"
+        "4. Click on the first request (usually 'app').\n"
+        "5. In the 'Headers' panel on the right, scroll down to 'Request Headers'.\n"
+        "6. Right-click the 'cookie:' value and click 'Copy value' (or just highlight all the text next to it and copy it).\n"
+        "7. Send it to the bot exactly as: `/cookies [paste here]`"
     )
