@@ -123,16 +123,10 @@ def get_cookies_for_domain(domain: str) -> list[dict]:
 def get_cookie_export_snippet() -> str:
     """Return the JavaScript snippet users should run in Chrome DevTools."""
     return (
-        "📋 *Export your cookies in 3 steps:*\n\n"
-        "*Step 1:* Open either Paytm (paytm.com/movies) OR Gemini (gemini.google.com) and make sure you're logged in\n\n"
-        "*Step 2:* Press `F12` → click the *Console* tab → paste this and press Enter:\n\n"
-        "```\n"
-        "copy(JSON.stringify(document.cookie.split('; ').map(c => {"
-        "const [n,...v] = c.split('=');"
-        "return {name:n, value:v.join('='), domain:window.location.hostname, path:'/'}"
-        "})))\n"
-        "```\n\n"
-        "*Step 3:* The cookies are now in your clipboard. Send them here as:\n"
-        "`/cookies [paste here]`\n\n"
-        "*(Note: You can do this once for Paytm and once for Gemini. The bot will automatically save and combine them!)*"
+        "📋 *Export your cookies correctly:*\n\n"
+        "*Step 1:* Install the 'EditThisCookie' extension for Chrome.\n\n"
+        "*Step 2:* Open gemini.google.com and make sure you're logged in.\n\n"
+        "*Step 3:* Click the EditThisCookie icon in your browser toolbar, then click the 'Export' button (the arrow pointing out the door icon).\n\n"
+        "*Step 4:* Your cookies are now copied to your clipboard. Send them here exactly as:\n"
+        "`/cookies [paste here]`"
     )
