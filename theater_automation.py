@@ -19,7 +19,7 @@ import requests
 from geopy.geocoders import Nominatim
 
 from seat_selector import SeatSelector
-from cookie_manager import save_cookies, get_cookie_export_snippet
+from cookie_manager import save_cookies, load_cookies, has_cookies, get_cookie_export_snippet
 from excel_logger import log_media_to_excel, get_excel_path
 from media_intel import download_telegram_file, analyze_media, generate_text_summary
 
@@ -213,7 +213,14 @@ class TheaterBot:
     def handle_message(self, current_chat_id, text):
         if not self.chat_id:
             self.chat_id = current_chat_id
-            self.send("✅ *Link established!*\n\nWelcome to your Personal Theater Concierge 🍿\nSend a location (e.g. `Nerul` or `Mumbai`) to start finding theaters.\n\nType `/help` at any time to see how this works.")
+            self.send(
+                "🎬 *Welcome to Agent-T — Smart Theater Bot* 🍿\n\n"
+                "I can do the following:\n"
+                "🎭 *Find Theaters* — Send a location (e.g. `Mumbai`)\n"
+                "📸 *Image Intel* — Send any photo to extract data\n"
+                "🍪 *Login* — Send a `cookies.txt` file for Gemini access\n\n"
+                "_Type /commands to see all available commands._"
+            )
             return
 
         text_stripped = text.strip()
@@ -224,30 +231,93 @@ class TheaterBot:
             self.stop_event.set()
             return
             
-        if text_stripped.lower() in ("hey", "hi", "hello", "/menu", "menu", "start"):
+        if text_stripped.lower() in ("/start", "hey", "hi", "hello", "/menu", "menu", "start"):
+            self.reset()
             self.send(
-                "👋 Hello! I am your Smart Theater Automator.\n\n"
-                "• To book tickets, reply with a *Location* (e.g., `Mumbai`).\n"
-                "• Send me any *Photo or Video* to auto-extract its data into Excel.\n"
-                "• Type `/help` for detailed instructions."
+                "🎬 *Welcome to Agent-T — Smart Theater Bot* 🍿\n\n"
+                "I can do the following:\n"
+                "🎭 *Find Theaters* — Send a location (e.g. `Mumbai`)\n"
+                "📸 *Image Intel* — Send any photo to extract data\n"
+                "🍪 *Login* — Send a `cookies.txt` file for Gemini access\n\n"
+                "_Type /commands to see all available commands._"
+            )
+            return
+
+        if text_stripped.lower() == "/commands":
+            self.send(
+                "📚 *All Available Commands:*\n\n"
+                "🔹 `/start` — Restart bot with a fresh session\n"
+                "🔹 `/help` — How to use the theater booking flow\n"
+                "🔹 `/commands` — Show this list of all commands\n"
+                "🔹 `/status` — Check bot health, cookie status & uptime\n"
+                "🔹 `/ping` — Quick check if the bot is alive\n"
+                "🔹 `/cookies` — Instructions to export browser cookies\n"
+                "🔹 `/clearcookies` — Wipe all saved cookies\n"
+                "🔹 `/restart` — Reset current booking session\n"
+                "🔹 `STOP` — Shut down the bot completely\n\n"
+                "_You can also send me any photo/video for AI data extraction!_"
             )
             return
             
         if text_stripped.lower() == "/restart":
             self.reset()
-            self.send("🔄 *Bot reset!* Start fresh by sending a location.")
+            self.send("🔄 *Bot reset!* All sessions cleared. Send a location to start fresh.")
             return
             
         if text_stripped.lower() == "/help":
             self.send(
-                "🤖 *How to use the Theater Bot:*\n"
-                "1️⃣ *Location:* Type any city or neighborhood to find nearby theaters.\n"
-                "2️⃣ *Theater:* Reply with the number of the theater you want to check.\n"
-                "3️⃣ *Movie & Time:* Pick your movie and showtime from the lists provided.\n"
-                "4️⃣ *Seats:* Tell me how many tickets you want. I will auto-select the best center seats!\n\n"
-                "⚠️ *Note:* To hold seats, you must log in using your browser cookies. Send `/cookies` for instructions on how to do that.\n"
-                "You can also say `back` or `other` during the process to change your selection."
+                "🤖 *Theater Booking Guide:*\n\n"
+                "1️⃣ *Send Location* — Type any city or area (e.g. `Nerul`, `Mumbai`)\n"
+                "2️⃣ *Pick Theater* — Reply with the number from the list\n"
+                "3️⃣ *Pick Movie & Time* — Choose from the available options\n"
+                "4️⃣ *Pick Seats* — Tell me how many tickets. I auto-select the best center seats!\n\n"
+                "📸 *Image Intel:* Send any photo and I will extract a summary, entities & key data using AI.\n\n"
+                "⚙️ *Navigation:* Type `back` to go to the previous step, or `other` to pick a different theater.\n\n"
+                "⚠️ *Important:* For image processing via Gemini, you must first send your cookies. Type `/cookies` for instructions."
             )
+            return
+
+        if text_stripped.lower() == "/ping":
+            uptime = datetime.now(timezone.utc) - self.start_time
+            hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            self.send(f"🏓 *Pong!* Bot is alive.\n⏱ Uptime: `{hours}h {minutes}m {seconds}s`")
+            return
+
+        if text_stripped.lower() == "/status":
+            uptime = datetime.now(timezone.utc) - self.start_time
+            hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            
+            cookie_status = "✅ Loaded" if has_cookies() else "❌ Not set"
+            cookie_count = len(load_cookies()) if has_cookies() else 0
+            
+            openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+            nvidia_key = os.getenv("NVIDIA_API_KEY", "")
+            airtable_key = os.getenv("AIRTABLE_API_KEY", "")
+            
+            self.send(
+                "📊 *Bot Status Dashboard:*\n\n"
+                f"⏱ *Uptime:* `{hours}h {minutes}m {seconds}s`\n"
+                f"🧠 *State:* `{self.bot_state}`\n"
+                f"🍪 *Cookies:* {cookie_status} ({cookie_count} cookies)\n"
+                f"🔑 *OpenRouter API:* {'\u2705 Set' if openrouter_key else '\u274c Missing'}\n"
+                f"🔑 *NVIDIA API:* {'\u2705 Set' if nvidia_key else '\u274c Missing'}\n"
+                f"📝 *Airtable:* {'\u2705 Connected' if airtable_key else '\u274c Not set'}\n\n"
+                f"🎬 *Cached Theaters:* {len(self.theaters_cache)}\n"
+                f"🎬 *Cached Movies:* {len(self.movies_cache)}\n"
+                f"🎬 *Cached Showtimes:* {len(self.showtimes_cache)}"
+            )
+            return
+
+        if text_stripped.lower() == "/clearcookies":
+            from pathlib import Path
+            cookie_file = Path(__file__).parent / "data" / "cookies.json"
+            if cookie_file.exists():
+                cookie_file.unlink()
+                self.send("🗑 *Cookies cleared!* The bot is now logged out.\nSend new cookies using `/cookies` or upload a `cookies.txt` file.")
+            else:
+                self.send("ℹ️ No cookies were saved. Nothing to clear.")
             return
 
         if text_stripped.lower() == "/cookies":
