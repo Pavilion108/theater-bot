@@ -97,6 +97,7 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
                     pass
             log.info("Image attached, waiting 8 seconds for upload to process...")
             time.sleep(8) # Wait for image upload thumbnail to render
+            driver.save_screenshot("gemini_debug.png") # SAVE SCREENSHOT FOR DEBUGGING
         except Exception as e:
             log.warning(f"Could not interact with file input on Gemini web: {e}")
             

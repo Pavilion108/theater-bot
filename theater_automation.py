@@ -659,6 +659,20 @@ class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"No dump found.")
             return
+            
+        if "/screenshot" in self.path:
+            try:
+                with open("gemini_debug.png", "rb") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header("Content-type", "image/png")
+                self.end_headers()
+                self.wfile.write(content)
+            except Exception as e:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"No screenshot found.")
+            return
 
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
