@@ -16,7 +16,7 @@ def log_to_airtable(data):
     
     if not api_key or not base_id or not table_name:
         log.warning("Airtable environment variables not fully configured. Skipping Airtable sync.")
-        return False
+        return False, "Airtable API keys are missing in Render settings."
         
     # Handle the case where the user pasted the full Airtable URL in AIRTABLE_BASE_ID
     if "airtable.com" in base_id:
