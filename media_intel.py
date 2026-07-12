@@ -34,48 +34,13 @@ def analyze_media(file_path, file_type):
     log.info(f"Processing media with Gemini headless browser: {filename}")
     try:
         prompt = "Extract a summary, category, and key numbers/entities from this media. Format as plain text without markdown."
+        response_text = query_gemini_web(file_path, prompt)
         
-        # EXTREMELY SMART FIX: Bypass brittle Web Scraper entirely if we have OpenRouter API key!
-        openrouter_key = os.getenv("OPENROUTER_API_KEY")
-        response_text = None
-        source = "Gemini Web UI"
-        
-        if openrouter_key and file_type == "image":
-            try:
-                log.info("Attempting to use OpenRouter API for ultra-fast and reliable image processing...")
-                base64_image = encode_image(file_path)
-                messages = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                        ]
-                    }
-                ]
-                resp = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {openrouter_key}"},
-                    json={"model": "google/gemini-1.5-flash", "messages": messages},
-                    timeout=45
-                )
-                if resp.status_code == 200:
-                    response_text = resp.json()["choices"][0]["message"]["content"]
-                    source = "OpenRouter (Gemini 1.5 Flash)"
-                else:
-                    log.warning(f"OpenRouter API failed with status {resp.status_code}. Falling back to Web Scraper.")
-            except Exception as e:
-                log.error(f"OpenRouter exception: {e}")
-                
-        if not response_text:
-            log.info("Using Gemini Web headless scraper as fallback...")
-            response_text = query_gemini_web(file_path, prompt)
-            
         result_data = {
             "filename": filename,
             "file_type": file_type,
             "summary": response_text[:500] if len(response_text) > 500 else response_text,
-            "entities": f"Extracted via {source}"
+            "entities": "Extracted via Gemini Web UI"
         }
         
         # Log to Airtable
