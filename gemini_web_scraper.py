@@ -89,11 +89,32 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
             except:
                 pass
                 
-            file_inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+            # Google heavily uses Web Components (Shadow DOM). Standard Selenium find_elements 
+            # won't find <input type="file"> if it's inside a shadow root!
+            # We use JS to recursively find all file inputs across all shadow roots.
+            js_script = """
+            function findFileInputs(root) {
+                let inputs = [];
+                let elements = root.querySelectorAll('*');
+                for (let el of elements) {
+                    if (el.tagName.toLowerCase() === 'input' && el.type === 'file') {
+                        inputs.push(el);
+                    }
+                    if (el.shadowRoot) {
+                        inputs = inputs.concat(findFileInputs(el.shadowRoot));
+                    }
+                }
+                return inputs;
+            }
+            return findFileInputs(document);
+            """
+            file_inputs = driver.execute_script(js_script)
+            
             for fi in file_inputs:
                 try:
                     fi.send_keys(os.path.abspath(file_path))
-                except:
+                except Exception as ex:
+                    log.warning(f"Could not send keys to shadow input: {ex}")
                     pass
             log.info("Image attached, waiting 8 seconds for upload to process...")
             time.sleep(8) # Wait for image upload thumbnail to render
