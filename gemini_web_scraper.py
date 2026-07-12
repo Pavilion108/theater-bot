@@ -43,14 +43,18 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
             driver_executable_path = path
             break
 
+    kwargs = {
+        "options": options,
+        "headless": True,
+        "use_subprocess": True
+    }
+    if executable_path:
+        kwargs["browser_executable_path"] = executable_path
+    if driver_executable_path:
+        kwargs["driver_executable_path"] = driver_executable_path
+
     try:
-        driver = uc.Chrome(
-            options=options,
-            browser_executable_path=executable_path,
-            driver_executable_path=driver_executable_path,
-            headless=True,
-            use_subprocess=True
-        )
+        driver = uc.Chrome(**kwargs)
     except Exception as e:
         log.error(f"Failed to launch Chrome: {e}")
         return f"Error: Failed to launch browser: {e}"

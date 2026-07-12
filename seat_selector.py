@@ -61,13 +61,17 @@ class SeatSelector:
                 driver_executable_path = path
                 break
 
-        self.driver = uc.Chrome(
-            options=options,
-            browser_executable_path=executable_path,
-            driver_executable_path=driver_executable_path,
-            headless=True,
-            use_subprocess=True
-        )
+        kwargs = {
+            "options": options,
+            "headless": True,
+            "use_subprocess": True
+        }
+        if executable_path:
+            kwargs["browser_executable_path"] = executable_path
+        if driver_executable_path:
+            kwargs["driver_executable_path"] = driver_executable_path
+
+        self.driver = uc.Chrome(**kwargs)
         
         # Additional stealth via CDP
         self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
