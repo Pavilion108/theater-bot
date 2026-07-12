@@ -9,6 +9,7 @@ as a logged-in real user.
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 log = logging.getLogger("TheaterBot")
@@ -29,11 +30,20 @@ def save_cookies(cookies_json_str: str) -> tuple[bool, str]:
         if not isinstance(cookies, list):
             return False, "Invalid format — expected a JSON array of cookies."
     except json.JSONDecodeError:
-        # Fallback: Assume it's a raw cookie string from Network tab
-        # e.g., "__Secure-1PSID=abc; NID=123;"
+        # Fallback: Assume it's a raw cookie string or a full cURL command
         raw_cookies = cookies_json_str.strip()
+        
+        # If it's a cURL command, extract the cookie header
+        if "curl " in raw_cookies.lower():
+            # Extract the content of the -H "cookie: ..." or -H 'cookie: ...' header
+            match = re.search(r"[-H|--header]\s+['\"]cookie:\s*(.+?)['\"]", raw_cookies, re.IGNORECASE)
+            if match:
+                raw_cookies = match.group(1)
+            else:
+                return False, "❌ Found cURL command, but couldn't find the 'cookie:' header in it."
+
         if "=" not in raw_cookies:
-            return False, "❌ Invalid format. Please provide valid JSON or a raw cookie string (key=value;)."
+            return False, "❌ Invalid format. Please provide valid JSON, a raw cookie string (key=value;), or a cURL command."
         
         cookies = []
         for pair in raw_cookies.split(";"):
@@ -149,9 +159,11 @@ def get_cookie_export_snippet() -> str:
         "**Option 2: Using Developer Tools (No Extensions)**\n"
         "1. Open gemini.google.com and log in.\n"
         "2. Press F12 to open Developer Tools.\n"
-        "3. Go to the **Network** tab and refresh the page.\n"
-        "4. Click on the first request (usually 'app').\n"
-        "5. In the 'Headers' panel on the right, scroll down to 'Request Headers'.\n"
-        "6. Right-click the 'cookie:' value and click 'Copy value' (or just highlight all the text next to it and copy it).\n"
-        "7. Send it to the bot exactly as: `/cookies [paste here]`"
+        "3. Click the **Network** tab at the top.\n"
+        "4. **Refresh the page (F5)** (this is very important!).\n"
+        "5. You will see a list of files loading. Click literally **ANY** item in that list.\n"
+        "6. A side panel opens. Scroll down to the **Request Headers** section.\n"
+        "7. Find the header labeled `cookie:`.\n"
+        "8. Right-click the massive block of text next to `cookie:` and click **Copy value** (or highlight all text next to it and copy).\n"
+        "9. Send it to the bot exactly as: `/cookies [paste here]`"
     )
