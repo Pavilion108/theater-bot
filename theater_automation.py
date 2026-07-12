@@ -308,11 +308,11 @@ class TheaterBot:
 
     def _handle_media(self, chat_id, msg):
         self.chat_id = chat_id
-        self.send("📸 Media received! Downloading and processing data...")
         
         try:
             file_id = None
             file_type = "unknown"
+            file_name = ""
             if "photo" in msg:
                 file_id = msg["photo"][-1]["file_id"]
                 file_type = "image"
@@ -321,9 +321,28 @@ class TheaterBot:
                 file_type = "video"
             elif "document" in msg:
                 file_id = msg["document"]["file_id"]
+                file_name = msg["document"].get("file_name", "").lower()
                 file_type = "document"
                 
             if not file_id: return
+            
+            # SMART: Detect if user is uploading a cookie file
+            if file_type == "document" and (file_name.endswith(".json") or file_name.endswith(".txt")):
+                # Could be a cookie file! Download and check.
+                save_path = f"data/media/{file_id}.tmp"
+                downloaded_path = download_telegram_file(file_id, TELEGRAM_BOT_TOKEN, save_path)
+                if downloaded_path:
+                    with open(downloaded_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read().strip()
+                    # Heuristic: if it looks like cookies (has cookie-like keys)
+                    if any(kw in content for kw in ['__Secure', 'SAPISID', 'SID', 'HSID', 'NID', '"name"', '"value"', '"domain"']):
+                        self.send("🍪 Cookie file detected! Processing...")
+                        success, result_msg = save_cookies(content)
+                        self.send(result_msg)
+                        return
+            
+            # Normal media processing
+            self.send("📸 Media received! Downloading and processing data...")
             
             save_path = f"data/media/{file_id}.tmp"
             downloaded_path = download_telegram_file(file_id, TELEGRAM_BOT_TOKEN, save_path)
