@@ -79,13 +79,26 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
             if "signin" in driver.current_url.lower():
                 return "Error: Gemini Web requires authentication. Please export your google.com cookies using /cookies command."
         
-        # Try to find file input
+        # Try to find file input and upload
         try:
-            file_input = driver.find_element(By.CSS_SELECTOR, 'input[type="file"]')
-            file_input.send_keys(os.path.abspath(file_path))
-            time.sleep(6) # wait for image upload
+            # First, try to click the "+" or "Upload" button to ensure the file input is in the DOM
+            try:
+                upload_btn = driver.find_element(By.CSS_SELECTOR, 'button[aria-label*="Upload"], button[aria-label*="Attach"], button.upload-button, span.upload-icon')
+                driver.execute_script("arguments[0].click();", upload_btn)
+                time.sleep(1)
+            except:
+                pass
+                
+            file_inputs = driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+            for fi in file_inputs:
+                try:
+                    fi.send_keys(os.path.abspath(file_path))
+                except:
+                    pass
+            log.info("Image attached, waiting 8 seconds for upload to process...")
+            time.sleep(8) # Wait for image upload thumbnail to render
         except Exception as e:
-            log.warning(f"Could not find file input on Gemini web: {e}")
+            log.warning(f"Could not interact with file input on Gemini web: {e}")
             
         # Find prompt input
         try:
