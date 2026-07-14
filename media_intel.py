@@ -27,15 +27,17 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
-def analyze_media(file_path, file_type):
+def analyze_media(file_path, file_type, status_callback=None):
     """Uses Gemini Web API via headless browser to extract details from an image or video."""
     filename = os.path.basename(file_path)
     
     log.info(f"Processing media with Gemini headless browser: {filename}")
+    if status_callback: status_callback(f"🧠 Initializing AI extraction for {filename}...")
     try:
         prompt = "Extract a summary, category, and key numbers/entities from this media. Format as plain text without markdown."
-        response_text = query_gemini_web(file_path, prompt)
+        response_text = query_gemini_web(file_path, prompt, status_callback=status_callback)
         
+        if status_callback: status_callback("✅ Response received. Standardizing and logging data...")
         result_data = {
             "filename": filename,
             "file_type": file_type,

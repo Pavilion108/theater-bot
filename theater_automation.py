@@ -422,7 +422,10 @@ class TheaterBot:
             downloaded_path = download_telegram_file(file_id, TELEGRAM_BOT_TOKEN, save_path)
             
             if downloaded_path:
-                intel = analyze_media(downloaded_path, file_type)
+                def status_update(msg_text):
+                    self.send(f"🤖 {msg_text}")
+                    
+                intel = analyze_media(downloaded_path, file_type, status_callback=status_update)
                 
                 # Check airtable status
                 airtable_status = intel.get("airtable_status", "Not synced")
@@ -431,7 +434,7 @@ class TheaterBot:
                 else:
                     status_emoji = "✅"
                 
-                self.send(f"🤖 *Extraction Complete!*\n\n*Summary:* {intel['summary']}\n\n*Entities:* {intel['entities']}\n\n{status_emoji} *Airtable:* {airtable_status}")
+                self.send(f"🤖 *Extraction Complete!*\n\n*Summary:* {intel['summary']}\n\n*Entities:* {intel['entities']}\n\n{status_emoji} *Airtable:* {airtable_status}\n\n💬 *You can now continue to chat and send more media!*")
         except Exception as e:
             log.error(f"Error handling media: {e}")
             self.send(f"❌ Failed to process media: {e}")

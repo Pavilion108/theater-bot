@@ -22,7 +22,7 @@ def _inject_cookies(driver, domain):
             pass
     return True
 
-def query_gemini_web(file_path: str, prompt: str) -> str:
+def query_gemini_web(file_path: str, prompt: str, status_callback=None) -> str:
     """Uses Selenium to query gemini.google.com directly to bypass API limits/issues."""
     options = uc.ChromeOptions()
     options.add_argument("--headless=new")
@@ -30,6 +30,9 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
     
+    if not prompt or prompt == "Extract a summary, category, and key numbers/entities from this media. Format as plain text without markdown.":
+        prompt = "smart Looop Prompt to get usefull intel shared on image or video"
+        
     # Try finding system chromium first for linux compatibility
     executable_path = None
     
@@ -60,6 +63,7 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
         kwargs["driver_executable_path"] = driver_executable_path
 
     try:
+        if status_callback: status_callback("🌐 Launching secure cloud browser...")
         driver = uc.Chrome(**kwargs)
     except Exception as e:
         log.error(f"Failed to launch Chrome: {e}")
@@ -71,6 +75,7 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
         has_cookies = _inject_cookies(driver, "google.com")
         
         # Navigate to Gemini
+        if status_callback: status_callback("🔐 Navigating to Gemini and checking login state...")
         driver.get("https://gemini.google.com/app")
         time.sleep(5)
         
@@ -91,14 +96,25 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
         
         # Try to find file input and upload
         try:
+            if status_callback: status_callback("➕ Clicking '+' to open attachment menu...")
             # First, try to click the "+" or "Upload" button to ensure the file input is in the DOM
             try:
-                upload_btn = driver.find_element(By.CSS_SELECTOR, 'button[aria-label*="Upload"], button[aria-label*="Attach"], button.upload-button, span.upload-icon')
+                upload_btn = driver.find_element(By.CSS_SELECTOR, 'button[aria-label*="Upload"], button[aria-label*="Attach"], button[aria-label*="Add"], button.upload-button, span.upload-icon')
                 driver.execute_script("arguments[0].click();", upload_btn)
+                time.sleep(1.5)
+            except:
+                pass
+                
+            if status_callback: status_callback("📂 Selecting 'Files' option to upload image...")
+            # Some UIs require clicking the "Files" option in the menu next
+            try:
+                files_menu_item = driver.find_element(By.XPATH, "//span[contains(text(), 'Files') or contains(text(), 'File')]/ancestor::button | //div[contains(text(), 'Files') or contains(text(), 'File')]")
+                driver.execute_script("arguments[0].click();", files_menu_item)
                 time.sleep(1)
             except:
                 pass
                 
+            if status_callback: status_callback("⏳ Injecting image to browser, waiting for upload...")
             # Google heavily uses Web Components (Shadow DOM). Standard Selenium find_elements 
             # won't find <input type="file"> if it's inside a shadow root!
             # We use JS to recursively find all file inputs across all shadow roots.
@@ -127,13 +143,16 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
                     log.warning(f"Could not send keys to shadow input: {ex}")
                     pass
             log.info("Image attached, waiting 8 seconds for upload to process...")
+            if status_callback: status_callback("🔄 Image uploaded. Waiting for rendering...")
             time.sleep(8) # Wait for image upload thumbnail to render
             driver.save_screenshot("gemini_debug.png") # SAVE SCREENSHOT FOR DEBUGGING
         except Exception as e:
             log.warning(f"Could not interact with file input on Gemini web: {e}")
+            if status_callback: status_callback("⚠️ Had trouble with standard upload, attempting to proceed...")
             
         # Find prompt input
         try:
+            if status_callback: status_callback("✍️ Typing Smart Loop Prompt...")
             chat_input = driver.find_element(By.CSS_SELECTOR, "div.text-input-field p, div.ql-editor, div[contenteditable='true']")
             chat_input.send_keys(prompt)
             time.sleep(1)
@@ -142,6 +161,7 @@ def query_gemini_web(file_path: str, prompt: str) -> str:
             
         # Submit
         try:
+            if status_callback: status_callback("🚀 Clicking the Send icon (next to mic)...")
             # Usually there is a button with an aria label for sending
             send_btn = driver.find_element(By.CSS_SELECTOR, 'button[aria-label*="Send"], button[aria-label*="Submit"], .send-button')
             driver.execute_script("arguments[0].click();", send_btn)
