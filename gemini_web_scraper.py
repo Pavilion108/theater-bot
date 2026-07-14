@@ -65,18 +65,27 @@ def query_gemini_web(file_path: str, prompt: str, status_callback=None) -> str:
     try:
         if status_callback: status_callback("🌐 Launching secure cloud browser...")
         driver = uc.Chrome(**kwargs)
+        driver.set_page_load_timeout(30)
     except Exception as e:
         log.error(f"Failed to launch Chrome: {e}")
         return f"Error: Failed to launch browser: {e}"
         
     try:
         # Load google to set cookies
-        driver.get("https://google.com/")
+        try:
+            driver.get("https://google.com/")
+        except Exception as e:
+            log.warning(f"Timeout or error loading google.com: {e}")
+            
         has_cookies = _inject_cookies(driver, "google.com")
         
         # Navigate to Gemini
         if status_callback: status_callback("🔐 Navigating to Gemini and checking login state...")
-        driver.get("https://gemini.google.com/app")
+        try:
+            driver.get("https://gemini.google.com/app")
+        except Exception as e:
+            log.warning(f"Timeout loading Gemini, proceeding anyway: {e}")
+            
         time.sleep(5)
         
         if not has_cookies:
