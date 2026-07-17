@@ -427,6 +427,15 @@ class TheaterBot:
                     
                 intel = analyze_media(downloaded_path, file_type, status_callback=status_update)
                 
+                # Excel Logging
+                excel_status = "Not logged"
+                try:
+                    excel_file = log_media_to_excel(chat_id, intel)
+                    excel_status = f"Saved to {os.path.basename(excel_file)}"
+                except Exception as ex:
+                    log.error(f"Failed to log to Excel: {ex}")
+                    excel_status = f"Error: {ex}"
+                
                 # Check airtable status
                 airtable_status = intel.get("airtable_status", "Not synced")
                 if "Error" in airtable_status:
@@ -434,7 +443,9 @@ class TheaterBot:
                 else:
                     status_emoji = "✅"
                 
-                self.send(f"🤖 *Extraction Complete!*\n\n*Summary:* {intel['summary']}\n\n*Entities:* {intel['entities']}\n\n{status_emoji} *Airtable:* {airtable_status}\n\n💬 *You can now continue to chat and send more media!*")
+                excel_emoji = "❌" if "Error" in excel_status else "✅"
+                
+                self.send(f"🤖 *Extraction Complete!*\n\n*Summary:* {intel['summary']}\n\n*Entities:* {intel['entities']}\n\n{status_emoji} *Airtable:* {airtable_status}\n{excel_emoji} *Excel:* {excel_status}\n\n💬 *You can now continue to chat and send more media!*")
         except Exception as e:
             log.error(f"Error handling media: {e}")
             self.send(f"❌ Failed to process media: {e}")

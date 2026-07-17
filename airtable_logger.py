@@ -49,7 +49,7 @@ def log_to_airtable(data):
     }
     
     try:
-        resp = requests.post(url, headers=headers, json=payload)
+        resp = requests.post(url, headers=headers, json=payload, timeout=15)
         resp.raise_for_status()
         log.info("Successfully synced media intel to Airtable!")
         return True, "Data successfully logged to Airtable."

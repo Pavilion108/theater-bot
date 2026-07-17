@@ -10,12 +10,12 @@ log = logging.getLogger("MediaIntel")
 
 def download_telegram_file(file_id, bot_token, save_path):
     url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
-    resp = requests.get(url).json()
+    resp = requests.get(url, timeout=15).json()
     if not resp.get('ok'): return None
     file_path = resp['result']['file_path']
     
     dl_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
-    file_data = requests.get(dl_url).content
+    file_data = requests.get(dl_url, timeout=30).content
     
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     with open(save_path, 'wb') as f:
