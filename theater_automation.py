@@ -93,12 +93,26 @@ class TheaterBot:
                         files={"photo": f},
                         timeout=30,
                     )
+                if not resp.json().get("ok") and "parse" in resp.text.lower():
+                    with open(photo_path, 'rb') as f:
+                        resp = requests.post(
+                            url_photo,
+                            data={"chat_id": target, "caption": text},
+                            files={"photo": f},
+                            timeout=30,
+                        )
             else:
                 resp = requests.post(
                     url_text,
                     json={"chat_id": target, "text": text, "parse_mode": "Markdown"},
                     timeout=10,
                 )
+                if not resp.json().get("ok") and "parse" in resp.text.lower():
+                    resp = requests.post(
+                        url_text,
+                        json={"chat_id": target, "text": text},
+                        timeout=10,
+                    )
                 
             if not resp.json().get("ok"):
                 log.warning(f"Telegram API error: {resp.text}")
