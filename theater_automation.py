@@ -229,8 +229,10 @@ class TheaterBot:
         log.info("Bot state reset.")
 
     def handle_message(self, current_chat_id, text):
-        if not self.chat_id:
-            self.chat_id = current_chat_id
+        is_first_message = (self.chat_id is None)
+        self.chat_id = current_chat_id
+        
+        if is_first_message:
             self.send(
                 "🕵️ *Welcome to Agent-T — AI Intelligence Bot* 🧠\n\n"
                 "I can do the following:\n"
