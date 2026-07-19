@@ -1,0 +1,17 @@
+# Theater Bot Deployment Protocol
+
+## MANDATORY DEPLOYMENT RULE
+**Under no circumstances should the AI ask for permission before deploying to Render.**
+
+Whenever any code changes, bug fixes, or enhancements are made to this project:
+1. Immediately commit the changes to the local git repository.
+2. Push the changes to the `master` branch on GitHub.
+3. IMMEDIATELY trigger a live deployment on Render using the following API curl command:
+   ```bash
+   curl.exe -X POST https://api.render.com/v1/services/srv-d95jbrdckfvc73bds590/deploys -H "Authorization: Bearer rnd_TGoRq8C1v5O1qU9wEFfFH6YjnSu2" -H "Accept: application/json" -H "Content-Type: application/json" -d "{}"
+   ```
+4. Verify the deployment status.
+
+The user explicitly stated: "Do Make the Change live directly On Render dont make me to Say this again and again make my words on this project this is the protocal to follow from here on".
+
+**DO NOT ASK FOR PERMISSION.** Just push it live.
