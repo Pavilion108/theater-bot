@@ -228,11 +228,12 @@ class TheaterBot:
         if not self.chat_id:
             self.chat_id = current_chat_id
             self.send(
-                "🎬 *Welcome to Agent-T — Smart Theater Bot* 🍿\n\n"
+                "🕵️ *Welcome to Agent-T — AI Intelligence Bot* 🧠\n\n"
                 "I can do the following:\n"
+                "📸 *Media Intel* — Send any photo/video/screenshot to extract structured data (summary, entities, sentiment, source)\n"
+                "📱 *Instagram News* — Share Instagram posts here for AI analysis\n"
                 "🎭 *Find Theaters* — Send a location (e.g. `Mumbai`)\n"
-                "📸 *Image Intel* — Send any photo to extract data\n"
-                "🍪 *Login* — Send a `cookies.txt` file for Gemini access\n\n"
+                "📊 *Daily Digest* — Auto-generated intelligence summary\n\n"
                 "_Type /commands to see all available commands._"
             )
             return
@@ -248,11 +249,12 @@ class TheaterBot:
         if text_stripped.lower() in ("/start", "hey", "hi", "hello", "/menu", "menu", "start"):
             self.reset()
             self.send(
-                "🎬 *Welcome to Agent-T — Smart Theater Bot* 🍿\n\n"
+                "🕵️ *Welcome to Agent-T — AI Intelligence Bot* 🧠\n\n"
                 "I can do the following:\n"
+                "📸 *Media Intel* — Send any photo/video/screenshot to extract structured data (summary, entities, sentiment, source)\n"
+                "📱 *Instagram News* — Share Instagram posts here for AI analysis\n"
                 "🎭 *Find Theaters* — Send a location (e.g. `Mumbai`)\n"
-                "📸 *Image Intel* — Send any photo to extract data\n"
-                "🍪 *Login* — Send a `cookies.txt` file for Gemini access\n\n"
+                "📊 *Daily Digest* — Auto-generated intelligence summary\n\n"
                 "_Type /commands to see all available commands._"
             )
             return
@@ -260,16 +262,21 @@ class TheaterBot:
         if text_stripped.lower() == "/commands":
             self.send(
                 "📚 *All Available Commands:*\n\n"
-                "🔹 `/start` — Restart bot with a fresh session\n"
-                "🔹 `/help` — How to use the theater booking flow\n"
-                "🔹 `/commands` — Show this list of all commands\n"
-                "🔹 `/status` — Check bot health, cookie status & uptime\n"
-                "🔹 `/ping` — Quick check if the bot is alive\n"
-                "🔹 `/cookies` — Instructions to export browser cookies\n"
-                "🔹 `/clearcookies` — Wipe all saved cookies\n"
-                "🔹 `/restart` — Reset current booking session\n"
-                "🔹 `STOP` — Shut down the bot completely\n\n"
-                "_You can also send me any photo/video for AI data extraction!_"
+                "🔸 *Intelligence:*\n"
+                "📸 Send any image — AI extracts summary, entities, sentiment\n"
+                "📱 Share Instagram posts — Same AI pipeline\n"
+                "`/digest` — Generate today's intelligence summary\n\n"
+                "🔸 *Theater Booking:*\n"
+                "`/start` — Restart bot with a fresh session\n"
+                "`/help` — How to use the theater booking flow\n"
+                "`/restart` — Reset current booking session\n\n"
+                "🔸 *System:*\n"
+                "`/status` — Check bot health, API keys & uptime\n"
+                "`/ping` — Quick check if the bot is alive\n"
+                "`/cookies` — Instructions to export browser cookies\n"
+                "`/clearcookies` — Wipe all saved cookies\n"
+                "`STOP` — Shut down the bot completely\n\n"
+                "_Share any image, screenshot, or Instagram post for instant AI analysis!_"
             )
             return
             
@@ -280,14 +287,21 @@ class TheaterBot:
             
         if text_stripped.lower() == "/help":
             self.send(
-                "🤖 *Theater Booking Guide:*\n\n"
-                "1️⃣ *Send Location* — Type any city or area (e.g. `Nerul`, `Mumbai`)\n"
-                "2️⃣ *Pick Theater* — Reply with the number from the list\n"
-                "3️⃣ *Pick Movie & Time* — Choose from the available options\n"
-                "4️⃣ *Pick Seats* — Tell me how many tickets. I auto-select the best center seats!\n\n"
-                "📸 *Image Intel:* Send any photo and I will extract a summary, entities & key data using AI.\n\n"
-                "⚙️ *Navigation:* Type `back` to go to the previous step, or `other` to pick a different theater.\n\n"
-                "⚠️ *Important:* For image processing via Gemini, you must first send your cookies. Type `/cookies` for instructions."
+                "🤖 *Agent-T User Guide:*\n\n"
+                "📸 *Media Intelligence:*\n"
+                "Just send any image, screenshot, or video and I'll extract:\n"
+                "• Summary of content\n"
+                "• Category (News, Finance, Tech, etc.)\n"
+                "• Key entities (people, places, numbers)\n"
+                "• Sentiment analysis\n"
+                "• Source detection\n\n"
+                "🎭 *Theater Booking:*\n"
+                "1️⃣ *Send Location* — Type any city or area\n"
+                "2️⃣ *Pick Theater* — Reply with the number\n"
+                "3️⃣ *Pick Movie & Time*\n"
+                "4️⃣ *Pick Seats* — Auto-selects best center seats!\n\n"
+                "⚙️ *Navigation:* Type `back` to go up, or `other` for different theater.\n"
+                "📊 *Digest:* Type `/digest` anytime for a summary of today's processed media."
             )
             return
 
@@ -309,22 +323,26 @@ class TheaterBot:
             openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
             nvidia_key = os.getenv("NVIDIA_API_KEY", "")
             airtable_key = os.getenv("AIRTABLE_API_KEY", "")
+            airtable_base = os.getenv("AIRTABLE_BASE_ID", "")
+            gemini_key = os.getenv("GEMINI_API_KEY", "")
             
             or_status = "✅ Set" if openrouter_key else "❌ Missing"
             nv_status = "✅ Set" if nvidia_key else "❌ Missing"
-            at_status = "✅ Connected" if airtable_key else "❌ Not set"
+            gm_status = "✅ Set" if gemini_key else "⚪ Optional"
+            at_status = f"✅ Connected ({airtable_base})" if airtable_key else "❌ Not set"
             
             self.send(
-                "📊 *Bot Status Dashboard:*\n\n"
+                "📊 *Agent-T Status Dashboard:*\n\n"
                 f"⏱ *Uptime:* `{hours}h {minutes}m {seconds}s`\n"
-                f"🧠 *State:* `{self.bot_state}`\n"
-                f"🍪 *Cookies:* {cookie_status} ({cookie_count} cookies)\n"
-                f"🔑 *OpenRouter API:* {or_status}\n"
-                f"🔑 *NVIDIA API:* {nv_status}\n"
-                f"📝 *Airtable:* {at_status}\n\n"
-                f"🎬 *Cached Theaters:* {len(self.theaters_cache)}\n"
-                f"🎬 *Cached Movies:* {len(self.movies_cache)}\n"
-                f"🎬 *Cached Showtimes:* {len(self.showtimes_cache)}"
+                f"🧠 *State:* `{self.bot_state}`\n\n"
+                f"*🔑 AI Providers:*\n"
+                f"  OpenRouter: {or_status}\n"
+                f"  NVIDIA NIM: {nv_status}\n"
+                f"  Google Gemini: {gm_status}\n\n"
+                f"*💾 Storage:*\n"
+                f"  Airtable: {at_status}\n"
+                f"  Cookies: {cookie_status} ({cookie_count})\n\n"
+                f"🎬 *Cached:* {len(self.theaters_cache)} theaters, {len(self.movies_cache)} movies"
             )
             return
 
@@ -340,6 +358,11 @@ class TheaterBot:
 
         if text_stripped.lower() == "/cookies":
             self.send(get_cookie_export_snippet())
+            return
+        
+        if text_stripped.lower() == "/digest":
+            self.send("📊 Generating intelligence digest for today...")
+            threading.Thread(target=self._generate_daily_summary, daemon=True).start()
             return
             
         if text_stripped.lower().startswith("/cookies") or (self.bot_state == "WAITING_LOCATION" and text_stripped.startswith("[") and text_stripped.endswith("]")):
@@ -416,21 +439,24 @@ class TheaterBot:
             
             # SMART: Detect if user is uploading a cookie file
             if file_type == "document" and (file_name.endswith(".json") or file_name.endswith(".txt")):
-                # Could be a cookie file! Download and check.
                 save_path = f"data/media/{file_id}.tmp"
                 downloaded_path = download_telegram_file(file_id, TELEGRAM_BOT_TOKEN, save_path)
                 if downloaded_path:
                     with open(downloaded_path, 'r', encoding='utf-8', errors='ignore') as f:
                         content = f.read().strip()
-                    # Heuristic: if it looks like cookies (has cookie-like keys)
                     if any(kw in content for kw in ['__Secure', 'SAPISID', 'SID', 'HSID', 'NID', '"name"', '"value"', '"domain"']):
                         self.send("🍪 Cookie file detected! Processing...")
                         success, result_msg = save_cookies(content)
                         self.send(result_msg)
                         return
             
+            # Check for Instagram shared content (caption may contain instagram link)
+            caption = msg.get("caption", "")
+            is_instagram = "instagram" in caption.lower() if caption else False
+            
             # Normal media processing
-            self.send("📸 Media received! Downloading and processing data...")
+            source_label = "📱 Instagram share" if is_instagram else "📸 Media"
+            self.send(f"{source_label} received! Downloading and processing with AI...")
             
             save_path = f"data/media/{file_id}.tmp"
             downloaded_path = download_telegram_file(file_id, TELEGRAM_BOT_TOKEN, save_path)
@@ -450,18 +476,72 @@ class TheaterBot:
                     log.error(f"Failed to log to Excel: {ex}")
                     excel_status = f"Error: {ex}"
                 
-                # Check airtable status
+                # Check statuses
                 airtable_status = intel.get("airtable_status", "Not synced")
-                if "Error" in airtable_status:
-                    status_emoji = "❌"
+                at_emoji = "❌" if "Error" in airtable_status or "Skipped" in airtable_status else "✅"
+                xl_emoji = "❌" if "Error" in excel_status else "✅"
+                is_error = intel.get("_is_error", False)
+                
+                if is_error:
+                    # Show error result
+                    self.send(
+                        f"⚠️ *Extraction Issue*\n\n"
+                        f"{intel['summary']}\n\n"
+                        f"{at_emoji} *Airtable:* {airtable_status}\n"
+                        f"{xl_emoji} *Excel:* {excel_status}\n\n"
+                        f"💡 _Check /status to verify API keys are configured._"
+                    )
                 else:
-                    status_emoji = "✅"
-                
-                excel_emoji = "❌" if "Error" in excel_status else "✅"
-                
-                self.send(f"🤖 *Extraction Complete!*\n\n*Summary:* {intel['summary']}\n\n*Entities:* {intel['entities']}\n\n{status_emoji} *Airtable:* {airtable_status}\n{excel_emoji} *Excel:* {excel_status}\n\n💬 *You can now continue to chat and send more media!*")
+                    # Build rich response
+                    category = intel.get('category', 'Other')
+                    sentiment = intel.get('sentiment', '')
+                    key_data = intel.get('key_data', '')
+                    source = intel.get('source', '')
+                    action_items = intel.get('action_items', 'None')
+                    
+                    # Category emoji mapping
+                    cat_emojis = {
+                        'News': '📰', 'Politics': '🏛️', 'Finance': '💰',
+                        'Technology': '💻', 'Sports': '⚽', 'Entertainment': '🎬',
+                        'Health': '🏥', 'Education': '📚', 'Business': '💼',
+                        'Science': '🔬', 'Social': '👥'
+                    }
+                    cat_emoji = cat_emojis.get(category, '📋')
+                    
+                    # Sentiment emoji
+                    sent_emojis = {'Positive': '🟢', 'Negative': '🔴', 'Neutral': '⚪', 'Mixed': '🟡'}
+                    sent_emoji = sent_emojis.get(sentiment, '⚪')
+                    
+                    response_lines = [
+                        f"🕵️ *Agent-T Intelligence Report*",
+                        f"",
+                        f"📝 *Summary:* {intel['summary']}",
+                        f"",
+                        f"{cat_emoji} *Category:* {category}",
+                        f"{sent_emoji} *Sentiment:* {sentiment}",
+                        f"🏷️ *Entities:* {intel['entities']}",
+                    ]
+                    
+                    if key_data and key_data.lower() != 'none':
+                        response_lines.append(f"📊 *Key Data:* {key_data}")
+                    if source and source.lower() != 'unknown':
+                        response_lines.append(f"📡 *Source:* {source}")
+                    if action_items and action_items.lower() != 'none':
+                        response_lines.append(f"⚡ *Action Items:* {action_items}")
+                    
+                    response_lines.extend([
+                        f"",
+                        f"{at_emoji} *Airtable:* {airtable_status}",
+                        f"{xl_emoji} *Excel:* {excel_status}",
+                        f"",
+                        f"💬 _Send more media for continuous intelligence gathering!_"
+                    ])
+                    
+                    self.send("\n".join(response_lines))
+            else:
+                self.send("❌ Failed to download media from Telegram. Please try again.")
         except Exception as e:
-            log.error(f"Error handling media: {e}")
+            log.error(f"Error handling media: {e}", exc_info=True)
             self.send(f"❌ Failed to process media: {e}")
 
     def _handle_location(self, text):
@@ -711,6 +791,7 @@ class TheaterBot:
         if not self.chat_id: return
         excel_file = get_excel_path(self.chat_id)
         if not os.path.exists(excel_file):
+            self.send("📊 No media has been processed yet today. Send some images first!")
             return
             
         try:
@@ -725,9 +806,21 @@ class TheaterBot:
                     today_logs.append(f"Time: {row[0]}, Type: {row[2]}\nSummary: {row[3]}\nEntities: {row[4]}")
             
             if not today_logs:
-                return # No logs today
+                self.send("📊 No media processed today yet. Send some images and I'll generate a summary!")
+                return
                 
-            prompt = f"Here are the logs of media processed today ({today}):\n\n" + "\n---\n".join(today_logs) + "\n\nPlease write a concise executive summary of all the information captured today."
+            prompt = (
+                f"You are Agent-T, an intelligence analyst. Here are {len(today_logs)} media items processed today ({today}):\n\n"
+                + "\n---\n".join(today_logs) 
+                + "\n\n"
+                "Generate a concise executive intelligence briefing with:\n"
+                "1. HEADLINE: One-line summary of today's key theme\n"
+                "2. TOP STORIES: Bullet points of the most important items\n"
+                "3. TRENDING: Common themes or topics across items\n"
+                "4. KEY NUMBERS: Important statistics or data points\n"
+                "5. WATCH LIST: Items that may need follow-up\n\n"
+                "Keep it concise and actionable. Use plain text, no markdown."
+            )
             
             summary = generate_text_summary(prompt)
             self.send(f"📊 *End of Day Executive Summary*\n\n{summary}")

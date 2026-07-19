@@ -3,5 +3,4 @@ geopy>=2.4.0
 python-dotenv>=1.0.0
 selenium>=4.15.0
 openpyxl
-google-generativeai
 undetected-chromedriver>=3.5.3
