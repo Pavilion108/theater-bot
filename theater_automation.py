@@ -46,12 +46,20 @@ log = logging.getLogger("TheaterBot")
 # ==============================================================================
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY", "")
-SEARCH_RADIUS_METERS = int(os.getenv("SEARCH_RADIUS_METERS", "8000"))
-REFRESH_INTERVAL_MINUTES = int(os.getenv("REFRESH_INTERVAL_MINUTES", "15"))
+try:
+    SEARCH_RADIUS_METERS = int(os.getenv("SEARCH_RADIUS_METERS", "8000"))
+except ValueError:
+    SEARCH_RADIUS_METERS = 8000
+
+try:
+    REFRESH_INTERVAL_MINUTES = int(os.getenv("REFRESH_INTERVAL_MINUTES", "15"))
+except ValueError:
+    REFRESH_INTERVAL_MINUTES = 15
 
 if not TELEGRAM_BOT_TOKEN:
-    log.error("❌ TELEGRAM_BOT_TOKEN is not set!")
-    sys.exit(1)
+    log.error("❌ TELEGRAM_BOT_TOKEN is not set! Bot will not function correctly.")
+    # Fallback to a dummy token to prevent immediate crash so we can see if this was the issue
+    TELEGRAM_BOT_TOKEN = "dummy_token"
 
 
 class TheaterBot:
@@ -908,7 +916,10 @@ class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
 def start_dummy_server():
-    port = int(os.getenv("PORT", 10000))
+    try:
+        port = int(os.getenv("PORT", 10000))
+    except ValueError:
+        port = 10000
     try:
         with socketserver.TCPServer(("", port), HealthCheckHandler) as httpd:
             log.info(f"Health check server started on port {port}")
