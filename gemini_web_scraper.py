@@ -1,340 +1,251 @@
-"""
-🧠 AI Vision Extractor — Multi-Provider API Engine
-=====================================================
-Replaces the old Selenium-based Gemini web scraper with direct API calls.
-Supports multiple AI providers with automatic fallback:
-  1. OpenRouter (Gemini 2.0 Flash, Qwen2-VL, etc.)
-  2. NVIDIA NIM (LLaVA, Cosmos)
-  3. Google Gemini API (native)
-
-This is infinitely more reliable than browser automation.
-"""
-
 import os
-import base64
-import json
+import time
 import logging
-import mimetypes
-import requests
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+
+from cookie_manager import load_cookies
 
 log = logging.getLogger("TheaterBot")
 
-# ──────────────────────────────────────────────────────────────────────
-# Smart Prompt — Extracts structured intelligence from any media
-# ──────────────────────────────────────────────────────────────────────
-EXTRACTION_PROMPT = """You are Agent-T, an AI intelligence extractor. Analyze this image/media and extract ALL useful information.
-
-Provide your response in this EXACT format (plain text, no markdown):
-
-SUMMARY: [2-3 sentence summary of what this image shows]
-CATEGORY: [One of: News, Politics, Finance, Technology, Sports, Entertainment, Health, Education, Business, Science, Social, Other]
-ENTITIES: [Comma-separated list of key people, organizations, places, numbers, dates mentioned]
-SENTIMENT: [Positive, Negative, Neutral, or Mixed]
-KEY_DATA: [Any specific numbers, statistics, prices, dates, or factual data points]
-SOURCE: [If visible - news channel, website, social media account, or "Unknown"]
-LANGUAGE: [Primary language of text in the image]
-ACTION_ITEMS: [Any calls to action, deadlines, or important follow-ups, or "None"]
-
-Be thorough. Extract every piece of useful information visible in the image."""
-
-# ──────────────────────────────────────────────────────────────────────
-# Provider 1: OpenRouter (Best — supports many vision models for free)
-# ──────────────────────────────────────────────────────────────────────
-def _query_openrouter(image_b64: str, mime_type: str, prompt: str) -> str | None:
-    """Query OpenRouter API with vision model."""
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        return None
-    
-    # Priority order of vision models (free or cheap tiers first)
-    models = [
-        "google/gemini-2.0-flash-exp:free",
-        "google/gemma-3-27b-it:free",
-        "qwen/qwen2.5-vl-72b-instruct:free",
-        "meta-llama/llama-4-scout:free",
-        "google/gemini-2.0-flash-001",
-        "qwen/qwen-2.5-vl-7b-instruct",
-    ]
-    
-    for model in models:
+def _inject_cookies(driver, domain):
+    cookies = load_cookies()
+    domain_cookies = [c for c in cookies if domain in c.get('domain', '')]
+    if not domain_cookies:
+        log.warning(f"No cookies found for {domain}. Gemini may require login.")
+        return False
+        
+    for c in domain_cookies:
         try:
-            log.info(f"Trying OpenRouter model: {model}")
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://agent-t.bot",
-                    "X-Title": "Agent-T Intelligence Bot"
-                },
-                json={
-                    "model": model,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:{mime_type};base64,{image_b64}"
-                                    }
-                                },
-                                {
-                                    "type": "text",
-                                    "text": prompt
-                                }
-                            ]
-                        }
-                    ],
-                    "max_tokens": 1500,
-                    "temperature": 0.3
-                },
-                timeout=60
-            )
-            
-            if resp.status_code == 200:
-                data = resp.json()
-                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                if content and len(content) > 20:
-                    log.info(f"✅ OpenRouter success with {model}")
-                    return content
-                else:
-                    log.warning(f"OpenRouter {model} returned empty/short response")
-            else:
-                error_info = resp.text[:200]
-                log.warning(f"OpenRouter {model} returned {resp.status_code}: {error_info}")
-                # If rate limited, try next model
-                if resp.status_code == 429:
-                    continue
-                # If auth error, no point trying other models on same provider
-                if resp.status_code in (401, 403):
-                    return None
-        except requests.exceptions.Timeout:
-            log.warning(f"OpenRouter {model} timed out")
-            continue
+            driver.add_cookie(c)
         except Exception as e:
-            log.warning(f"OpenRouter {model} error: {e}")
-            continue
-    
-    return None
+            pass
+    return True
 
-
-# ──────────────────────────────────────────────────────────────────────
-# Provider 2: NVIDIA NIM API
-# ──────────────────────────────────────────────────────────────────────
-def _query_nvidia(image_b64: str, mime_type: str, prompt: str) -> str | None:
-    """Query NVIDIA NIM API with vision model."""
-    api_key = os.getenv("NVIDIA_API_KEY")
-    if not api_key or not api_key.startswith("nvapi-"):
-        return None
-    
-    try:
-        log.info("Trying NVIDIA NIM API...")
-        resp = requests.post(
-            "https://integrate.api.nvidia.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "microsoft/phi-4-multimodal-instruct",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{mime_type};base64,{image_b64}"
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": prompt
-                            }
-                        ]
-                    }
-                ],
-                "max_tokens": 1500,
-                "temperature": 0.3
-            },
-            timeout=60
-        )
-        
-        if resp.status_code == 200:
-            content = resp.json()["choices"][0]["message"]["content"]
-            if content and len(content) > 20:
-                log.info("✅ NVIDIA NIM success")
-                return content
-    except Exception as e:
-        log.warning(f"NVIDIA NIM error: {e}")
-    
-    return None
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Provider 3: Google Gemini API (native)
-# ──────────────────────────────────────────────────────────────────────
-def _query_gemini_native(image_b64: str, mime_type: str, prompt: str) -> str | None:
-    """Query Google Gemini API directly."""
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return None
-    
-    try:
-        log.info("Trying Google Gemini API...")
-        resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
-            headers={"Content-Type": "application/json"},
-            json={
-                "contents": [{
-                    "parts": [
-                        {
-                            "inline_data": {
-                                "mime_type": mime_type,
-                                "data": image_b64
-                            }
-                        },
-                        {"text": prompt}
-                    ]
-                }],
-                "generationConfig": {
-                    "temperature": 0.3,
-                    "maxOutputTokens": 1500
-                }
-            },
-            timeout=60
-        )
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            content = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-            if content and len(content) > 20:
-                log.info("✅ Google Gemini API success")
-                return content
-    except Exception as e:
-        log.warning(f"Google Gemini API error: {e}")
-    
-    return None
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Main Entry Point — Replaces the old query_gemini_web function
-# ──────────────────────────────────────────────────────────────────────
 def query_gemini_web(file_path: str, prompt: str, status_callback=None) -> str:
-    """
-    Analyze an image using AI vision APIs.
+    """Uses Selenium to query gemini.google.com directly to bypass API limits/issues."""
+    options = uc.ChromeOptions()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
     
-    This replaces the old Selenium-based Gemini web scraper.
-    Uses direct API calls with automatic fallback across providers.
-    
-    Args:
-        file_path: Path to the image/media file
-        prompt: The extraction prompt (uses smart default if generic)
-        status_callback: Optional function to send status updates
-    
-    Returns:
-        Extracted text content from the image
-    """
-    # Use our smart extraction prompt instead of the generic one
     if not prompt or prompt == "Extract a summary, category, and key numbers/entities from this media. Format as plain text without markdown.":
-        prompt = EXTRACTION_PROMPT
-    
-    # Step 1: Read and encode the image
-    if status_callback:
-        status_callback("📖 Reading and encoding image...")
-    
-    try:
-        with open(file_path, "rb") as f:
-            image_data = f.read()
+        prompt = "smart Looop Prompt to get usefull intel shared on image or video"
         
-        # Check file size (most APIs limit to ~20MB for base64)
-        file_size_mb = len(image_data) / (1024 * 1024)
-        if file_size_mb > 15:
-            return "Error: Image file is too large (>15MB). Please send a smaller image."
-        
-        image_b64 = base64.b64encode(image_data).decode("utf-8")
-        
-        # Detect MIME type
-        mime_type, _ = mimetypes.guess_type(file_path)
-        if not mime_type or not mime_type.startswith("image"):
-            # Default to JPEG for unknown types (Telegram often strips extensions)
-            mime_type = "image/jpeg"
-        
-        log.info(f"Image encoded: {file_size_mb:.1f}MB, type: {mime_type}")
-    except Exception as e:
-        return f"Error: Could not read image file: {e}"
+    # Try finding system chromium first for linux compatibility
+    executable_path = None
     
-    # Step 2: Try each provider in order
-    if status_callback:
-        status_callback("🧠 Sending to AI for analysis...")
+    # Also search Playwright's internal directory if present in Docker
+    import glob
+    pw_paths = glob.glob("/ms-playwright/chromium-*/chrome-linux/chrome")
     
-    providers = [
-        ("OpenRouter", _query_openrouter),
-        ("NVIDIA NIM", _query_nvidia),
-        ("Google Gemini", _query_gemini_native),
-    ]
-    
-    errors = []
-    for name, provider_fn in providers:
-        if status_callback:
-            status_callback(f"🔄 Trying {name}...")
-        
-        try:
-            result = provider_fn(image_b64, mime_type, prompt)
-            if result:
-                return result
-            errors.append(f"{name}: No valid response")
-        except Exception as e:
-            errors.append(f"{name}: {e}")
-            log.error(f"Provider {name} failed: {e}")
-    
-    # All providers failed
-    error_summary = " | ".join(errors)
-    return f"Error: All AI providers failed. Details: {error_summary}"
+    for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"] + pw_paths:
+        if os.path.exists(path):
+            executable_path = path
+            break
+            
+    driver_executable_path = None
+    for path in ["/usr/bin/chromedriver", "/usr/lib/chromium/chromedriver"]:
+        if os.path.exists(path):
+            driver_executable_path = path
+            break
 
-
-def parse_extraction_result(raw_text: str) -> dict:
-    """
-    Parses the structured extraction result into a dictionary.
-    
-    Args:
-        raw_text: The raw text response from the AI
-    
-    Returns:
-        Dictionary with parsed fields
-    """
-    result = {
-        "summary": "",
-        "category": "Other",
-        "entities": "",
-        "sentiment": "Neutral",
-        "key_data": "",
-        "source": "Unknown",
-        "language": "English",
-        "action_items": "None"
+    kwargs = {
+        "options": options,
+        "headless": True,
+        "use_subprocess": True,
+        "version_main": 123
     }
-    
-    if raw_text.startswith("Error:"):
-        result["summary"] = raw_text
-        return result
-    
-    # Parse line-by-line
-    lines = raw_text.strip().split("\n")
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
+    if executable_path:
+        kwargs["browser_executable_path"] = executable_path
+    if driver_executable_path:
+        kwargs["driver_executable_path"] = driver_executable_path
+
+    try:
+        if status_callback: status_callback("🌐 Launching secure cloud browser...")
+        driver = uc.Chrome(**kwargs)
+        driver.set_page_load_timeout(30)
+    except Exception as e:
+        log.error(f"Failed to launch Chrome: {e}")
+        return f"Error: Failed to launch browser: {e}"
         
-        # Match KEY: VALUE format
-        for key in ["SUMMARY", "CATEGORY", "ENTITIES", "SENTIMENT", "KEY_DATA", "SOURCE", "LANGUAGE", "ACTION_ITEMS"]:
-            if line.upper().startswith(f"{key}:"):
-                value = line[len(key) + 1:].strip()
-                result[key.lower()] = value
-                break
-    
-    # If no structured parsing worked, use the whole text as summary
-    if not result["summary"] and raw_text:
-        result["summary"] = raw_text[:500]
-    
-    return result
+    try:
+        # Load google to set cookies
+        try:
+            driver.get("https://google.com/")
+        except Exception as e:
+            log.warning(f"Timeout or error loading google.com: {e}")
+            
+        has_cookies = _inject_cookies(driver, "google.com")
+        
+        # Navigate to Gemini
+        if status_callback: status_callback("🔐 Navigating to Gemini and checking login state...")
+        try:
+            driver.get("https://gemini.google.com/app")
+        except Exception as e:
+            log.warning(f"Timeout loading Gemini, proceeding anyway: {e}")
+            
+        time.sleep(5)
+        
+        if not has_cookies:
+            # Check if we are on login screen
+            if "signin" in driver.current_url.lower():
+                return "Error: Gemini Web requires authentication. Please export your google.com cookies using /cookies command."
+                
+        # Google now allows unauthenticated users on /app, but blocks image uploads!
+        # We must check if the "Sign in" button is on the page.
+        try:
+            time.sleep(2)
+            sign_in_text = driver.find_elements(By.XPATH, "//*[contains(text(), 'Sign in to try tools') or text()='Sign in']")
+            if sign_in_text:
+                return "Error: Gemini Web requires authentication to upload images. Your cookies were wiped during the server restart! Please export your google.com cookies and send them using the /cookies command again."
+        except:
+            pass
+        
+        # Try to find file input and upload
+        try:
+            if status_callback: status_callback("➕ Clicking '+' to open attachment menu...")
+            # First, try to click the "+" or "Upload" button to ensure the file input is in the DOM
+            try:
+                upload_btn = driver.find_element(By.CSS_SELECTOR, 'button[aria-label*="Upload"], button[aria-label*="Attach"], button[aria-label*="Add"], button.upload-button, span.upload-icon')
+                driver.execute_script("arguments[0].click();", upload_btn)
+                time.sleep(1.5)
+            except:
+                pass
+                
+            if status_callback: status_callback("📂 Selecting 'Files' option to upload image...")
+            # Some UIs require clicking the "Files" option in the menu next
+            try:
+                files_menu_item = driver.find_element(By.XPATH, "//span[contains(text(), 'Files') or contains(text(), 'File')]/ancestor::button | //div[contains(text(), 'Files') or contains(text(), 'File')]")
+                driver.execute_script("arguments[0].click();", files_menu_item)
+                time.sleep(1)
+            except:
+                pass
+                
+            if status_callback: status_callback("⏳ Injecting image to browser, waiting for upload...")
+            # Google heavily uses Web Components (Shadow DOM). Standard Selenium find_elements 
+            # won't find <input type="file"> if it's inside a shadow root!
+            # We use JS to recursively find all file inputs across all shadow roots.
+            js_script = """
+            function findFileInputs(root) {
+                let inputs = [];
+                let elements = root.querySelectorAll('*');
+                for (let el of elements) {
+                    if (el.tagName.toLowerCase() === 'input' && el.type === 'file') {
+                        inputs.push(el);
+                    }
+                    if (el.shadowRoot) {
+                        inputs = inputs.concat(findFileInputs(el.shadowRoot));
+                    }
+                }
+                return inputs;
+            }
+            return findFileInputs(document);
+            """
+            file_inputs = driver.execute_script(js_script)
+            
+            for fi in file_inputs:
+                try:
+                    fi.send_keys(os.path.abspath(file_path))
+                except Exception as ex:
+                    log.warning(f"Could not send keys to shadow input: {ex}")
+                    pass
+            log.info("Image attached, waiting 8 seconds for upload to process...")
+            if status_callback: status_callback("🔄 Image uploaded. Waiting for rendering...")
+            time.sleep(8) # Wait for image upload thumbnail to render
+            driver.save_screenshot("gemini_debug.png") # SAVE SCREENSHOT FOR DEBUGGING
+        except Exception as e:
+            log.warning(f"Could not interact with file input on Gemini web: {e}")
+            if status_callback: status_callback("⚠️ Had trouble with standard upload, attempting to proceed...")
+            
+        # Find prompt input
+        try:
+            if status_callback: status_callback("✍️ Typing Smart Loop Prompt...")
+            chat_input = driver.find_element(By.CSS_SELECTOR, "div.text-input-field p, div.ql-editor, div[contenteditable='true']")
+            chat_input.send_keys(prompt)
+            time.sleep(1)
+        except Exception as e:
+            return f"Error: Could not interact with Gemini chat input: {e}"
+            
+        # Submit
+        try:
+            if status_callback: status_callback("🚀 Clicking the Send icon (next to mic)...")
+            js_send = """
+            function findAndClickSend(root) {
+                let elements = root.querySelectorAll('button[aria-label*="Send"], button[aria-label*="Submit"], .send-button, .send-icon');
+                if (elements.length > 0) {
+                    elements[elements.length - 1].click();
+                    return true;
+                }
+                for (let el of root.querySelectorAll('*')) {
+                    if (el.shadowRoot) {
+                        if (findAndClickSend(el.shadowRoot)) return true;
+                    }
+                }
+                return false;
+            }
+            return findAndClickSend(document);
+            """
+            clicked = driver.execute_script(js_send)
+            if not clicked:
+                from selenium.webdriver.common.keys import Keys
+                chat_input.send_keys(Keys.ENTER)
+        except:
+            pass
+            
+        log.info("Prompt sent to Gemini Web, waiting for response...")
+        
+        # Wait up to 45 seconds for a response to appear
+        js_get_response = """
+        function getGeminiResponse(root) {
+            let responses = [];
+            let elements = root.querySelectorAll('*');
+            for (let el of elements) {
+                if (el.tagName && el.tagName.toLowerCase() === 'message-content') {
+                    responses.push(el.textContent || el.innerText);
+                }
+                if (el.classList && (el.classList.contains('model-response-text') || el.classList.contains('markdown'))) {
+                    responses.push(el.textContent || el.innerText);
+                }
+                if (el.shadowRoot) {
+                    responses = responses.concat(getGeminiResponse(el.shadowRoot));
+                }
+            }
+            return responses;
+        }
+        return getGeminiResponse(document);
+        """
+        
+        for i in range(45):
+            time.sleep(1)
+            try:
+                responses = driver.execute_script(js_get_response)
+                if responses and len(responses[-1]) > 10:
+                    # Let it finish typing out completely
+                    time.sleep(5)
+                    final_responses = driver.execute_script(js_get_response)
+                    return final_responses[-1]
+            except:
+                pass
+        
+        # If we reach here, we failed. Let's dump the HTML for debugging!
+        try:
+            log.error("Failed to find response. Dumping page source snippet for debugging:")
+            log.error(driver.page_source[-1000:]) # log last 1000 chars or save to file
+            with open("gemini_error_dump.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+        except:
+            pass
+            
+        return "Error: No response generated by Gemini web after waiting. (DOM might have changed). View HTML dump at: https://jackbot-24-7.onrender.com/dump"
+            
+    except Exception as e:
+        log.error(f"Error interacting with Gemini web: {e}")
+        return f"Error: {e}"
+        
+    finally:
+        try:
+            driver.quit()
+        except:
+            pass
