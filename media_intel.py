@@ -129,12 +129,4 @@ def generate_text_summary(prompt):
             if resp.status_code == 200: return resp.json()["choices"][0]["message"]["content"]
         except: pass
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if api_key and genai:
-        try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            return model.generate_content(prompt).text
-        except: pass
-        
     return "Failed to generate summary: No valid API keys available."
