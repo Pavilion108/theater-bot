@@ -215,10 +215,6 @@ class TheaterBot:
     # Bot Core Logic
     # ──────────────────────────────────────────────────────────────────────
     def reset(self):
-        self.stop_event.set()
-        time.sleep(1)
-        self.stop_event.clear()
-        
         self.bot_state = "WAITING_LOCATION"
         self.theaters_cache = []
         self.movies_cache = []
@@ -250,8 +246,8 @@ class TheaterBot:
         text_upper = text_stripped.upper()
 
         if text_upper == "STOP":
-            self.send("🛑 *Shutting down...* Goodbye!")
-            self.stop_event.set()
+            self.send("🛑 *Session ended.*")
+            self.reset()
             return
             
         if text_stripped.lower() in ("/start", "hey", "hi", "hello", "/menu", "menu", "start"):
