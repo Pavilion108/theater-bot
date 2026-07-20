@@ -959,12 +959,36 @@ def main():
     # Start the dummy server in a background thread for Render
     threading.Thread(target=start_dummy_server, daemon=True).start()
     
-    bot = TheaterBot()
-    def handler(signum, frame):
-        bot.stop_event.set()
-    signal.signal(signal.SIGINT, handler)
-    signal.signal(signal.SIGTERM, handler)
-    bot.run()
+    # Startup diagnostic — send a message to admin to prove the bot is alive
+    admin_chat_id = 868003810
+    try:
+        log.info("🚀 Sending startup diagnostic message...")
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": admin_chat_id, "text": "🟢 Agent-T v4.0 just booted on Render!\nPolling loop starting now..."},
+            timeout=10
+        )
+    except Exception as e:
+        log.error(f"Startup diagnostic failed: {e}")
+    
+    try:
+        bot = TheaterBot()
+        def handler(signum, frame):
+            bot.stop_event.set()
+        signal.signal(signal.SIGINT, handler)
+        signal.signal(signal.SIGTERM, handler)
+        bot.run()
+    except Exception as e:
+        log.critical(f"💀 FATAL CRASH: {e}", exc_info=True)
+        # Try to notify admin about the crash
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": admin_chat_id, "text": f"💀 Agent-T CRASHED on startup!\n\nError: {e}"},
+                timeout=10
+            )
+        except:
+            pass
 
 if __name__ == "__main__":
     main()
