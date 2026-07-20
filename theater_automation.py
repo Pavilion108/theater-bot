@@ -812,22 +812,6 @@ class TheaterBot:
         if not self.chat_id: return
         self.send("📊 Daily summaries are now maintained natively in your Airtable 'Intel_Log' base.")
         return
-                f"You are Agent-T, an intelligence analyst. Here are {len(today_logs)} media items processed today ({today}):\n\n"
-                + "\n---\n".join(today_logs) 
-                + "\n\n"
-                "Generate a concise executive intelligence briefing with:\n"
-                "1. HEADLINE: One-line summary of today's key theme\n"
-                "2. TOP STORIES: Bullet points of the most important items\n"
-                "3. TRENDING: Common themes or topics across items\n"
-                "4. KEY NUMBERS: Important statistics or data points\n"
-                "5. WATCH LIST: Items that may need follow-up\n\n"
-                "Keep it concise and actionable. Use plain text, no markdown."
-            )
-            
-            summary = generate_text_summary(prompt)
-            self.send(f"📊 *End of Day Executive Summary*\n\n{summary}")
-        except Exception as e:
-            log.error(f"Failed to generate daily summary: {e}")
 
     def _keep_alive_loop(self):
         """Ping our own health endpoint every 10 minutes to prevent Render free tier sleep."""
