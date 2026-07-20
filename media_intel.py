@@ -2,11 +2,32 @@ import os
 import logging
 import requests
 import base64
+import json
+import re
+import mimetypes
 
-from gemini_web_scraper import query_gemini_web
 from airtable_logger import log_to_airtable
 
 log = logging.getLogger("MediaIntel")
+
+# Vision models ranked by capability for image analysis (not generation)
+VISION_MODELS = [
+    "google/gemini-2.5-flash",          # Fast, excellent vision, cheap
+    "google/gemini-2.0-flash-001",      # Strong fallback
+    "meta-llama/llama-4-scout",         # Free tier capable vision
+]
+
+INTEL_PROMPT = (
+    "Analyze this media and extract intelligence. Return the result STRICTLY as a JSON object with these keys: "
+    "'summary' (2-3 sentences), 'category' (News, Politics, Finance, Tech, Entertainment, Sports, Health, or Other), "
+    "'entities' (comma separated list of people, organizations, locations), "
+    "'sentiment' (Positive, Negative, Neutral, or Mixed), "
+    "'key_data' (any important numbers, dates, or metrics, else 'None'), "
+    "'source' (the likely source of this media, else 'Unknown'), "
+    "'action_items' (1-2 bullet points if applicable, else 'None'). "
+    "Return ONLY the JSON object, no markdown fences, no explanation."
+)
+
 
 def download_telegram_file(file_id, bot_token, save_path):
     url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}"
@@ -22,35 +43,136 @@ def download_telegram_file(file_id, bot_token, save_path):
         f.write(file_data)
     return save_path
 
+
 def encode_image(image_path):
     """Encodes image to base64 for vision APIs."""
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
+
+def _get_mime_type(file_path):
+    """Detect MIME type from file extension or content."""
+    mime, _ = mimetypes.guess_type(file_path)
+    if mime:
+        return mime
+    # Fallback: check magic bytes
+    try:
+        with open(file_path, 'rb') as f:
+            header = f.read(16)
+        if header[:4] == b'\x89PNG':
+            return 'image/png'
+        if header[:2] == b'\xff\xd8':
+            return 'image/jpeg'
+        if header[:4] == b'GIF8':
+            return 'image/gif'
+        if header[:4] == b'RIFF' and header[8:12] == b'WEBP':
+            return 'image/webp'
+    except:
+        pass
+    return 'image/jpeg'  # Safe default
+
+
+def _call_openrouter_vision(api_key, image_b64, mime_type, prompt, model):
+    """Make a single OpenRouter vision API call."""
+    resp = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://jackbot-24-7.onrender.com",
+            "X-Title": "Agent-T Intelligence Bot",
+        },
+        json={
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_b64}"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt,
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 1024,
+            "temperature": 0.3,
+        },
+        timeout=60
+    )
+    
+    if resp.status_code == 200:
+        data = resp.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        model_used = data.get("model", model)
+        return content, model_used
+    else:
+        log.warning(f"OpenRouter {model} returned {resp.status_code}: {resp.text[:200]}")
+        return None, None
+
+
 def analyze_media(file_path, file_type, status_callback=None):
-    """Uses Gemini Web API via headless browser to extract details from an image or video."""
+    """Uses OpenRouter Vision API to extract intelligence from an image."""
     filename = os.path.basename(file_path)
     
-    log.info(f"Processing media with Gemini headless browser: {filename}")
-    if status_callback: status_callback(f"🧠 Initializing AI extraction for {filename}...")
+    log.info(f"Processing media via OpenRouter Vision API: {filename}")
+    if status_callback: status_callback("🧠 Encoding image for AI vision analysis...")
+    
     try:
-        prompt = (
-            "Analyze this media and extract intelligence. Return the result STRICTLY as a JSON object with these keys: "
-            "'summary' (2-3 sentences), 'category' (News, Politics, Finance, Tech, Entertainment, Sports, Health, or Other), "
-            "'entities' (comma separated list of people, organizations, locations), "
-            "'sentiment' (Positive, Negative, Neutral, or Mixed), "
-            "'key_data' (any important numbers, dates, or metrics, else 'None'), "
-            "'source' (the likely source of this media, else 'Unknown'), "
-            "'action_items' (1-2 bullet points if applicable, else 'None')."
-        )
-        response_text = query_gemini_web(file_path, prompt, status_callback=status_callback)
+        # Encode the image
+        image_b64 = encode_image(file_path)
+        mime_type = _get_mime_type(file_path)
         
-        if status_callback: status_callback("✅ Response received. Standardizing and logging data...")
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
+        if not openrouter_key:
+            return {
+                "filename": filename,
+                "file_type": file_type,
+                "summary": "Error: OPENROUTER_API_KEY not set in environment variables.",
+                "entities": "Error",
+                "_is_error": True,
+                "airtable_status": "Skipped (No API Key)"
+            }
         
-        import json
-        import re
+        # Try each vision model in order until one works
+        response_text = None
+        model_used = None
         
-        # Try to parse JSON from the response text
+        for model in VISION_MODELS:
+            if status_callback: status_callback(f"🔍 Analyzing with `{model.split('/')[-1]}`...")
+            
+            try:
+                response_text, model_used = _call_openrouter_vision(
+                    openrouter_key, image_b64, mime_type, INTEL_PROMPT, model
+                )
+                if response_text and len(response_text) > 10:
+                    log.info(f"Got response from {model_used} ({len(response_text)} chars)")
+                    break
+                else:
+                    response_text = None
+            except Exception as e:
+                log.warning(f"Model {model} failed: {e}")
+                continue
+        
+        if not response_text:
+            return {
+                "filename": filename,
+                "file_type": file_type,
+                "summary": "Error: All AI vision models failed to analyze this image. Check your OpenRouter API key balance.",
+                "entities": "Error",
+                "_is_error": True,
+                "airtable_status": "Skipped (All Models Failed)"
+            }
+        
+        if status_callback: status_callback(f"✅ AI response received from `{model_used.split('/')[-1] if model_used else 'unknown'}`. Parsing...")
+        
+        # Parse the response
         result_data = {
             "filename": filename,
             "file_type": file_type,
@@ -60,18 +182,25 @@ def analyze_media(file_path, file_type, status_callback=None):
             "sentiment": "Neutral",
             "key_data": "None",
             "source": "Unknown",
-            "action_items": "None"
+            "action_items": "None",
+            "model_used": model_used or "unknown",
         }
         
         try:
-            match = re.search(r'\{.*\}', response_text.replace('\n', ' '), re.DOTALL)
+            # Strip markdown code fences if present
+            cleaned = response_text.strip()
+            if cleaned.startswith("```"):
+                cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned)
+                cleaned = re.sub(r'\s*```$', '', cleaned)
+            
+            match = re.search(r'\{.*\}', cleaned.replace('\n', ' '), re.DOTALL)
             if match:
                 parsed = json.loads(match.group(0))
                 for k in ["summary", "entities", "category", "sentiment", "key_data", "source", "action_items"]:
                     if k in parsed:
                         result_data[k] = str(parsed[k])
         except:
-            pass # Fallback to the raw text in summary field
+            pass  # Fallback to the raw text in summary field
             
         # Log to Airtable
         airtable_success, airtable_msg = log_to_airtable(result_data)
@@ -79,7 +208,7 @@ def analyze_media(file_path, file_type, status_callback=None):
         
         return result_data
     except Exception as e:
-        log.error(f"Gemini Web scraper error: {e}")
+        log.error(f"OpenRouter Vision API error: {e}", exc_info=True)
         return {
             "filename": filename,
             "file_type": file_type,
@@ -89,10 +218,23 @@ def analyze_media(file_path, file_type, status_callback=None):
             "airtable_status": "Skipped (Error)"
         }
 
+
 def generate_text_summary(prompt):
     """Uses available AI APIs to generate a daily summary from Excel text data."""
     messages = [{"role": "user", "content": prompt}]
     
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if openrouter_key:
+        try:
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {openrouter_key}"},
+                json={"model": "google/gemini-2.5-flash", "messages": messages, "max_tokens": 1024},
+                timeout=30
+            )
+            if resp.status_code == 200: return resp.json()["choices"][0]["message"]["content"]
+        except: pass
+
     nvidia_key = os.getenv("NVIDIA_API_KEY") or os.getenv("KIMI_API_KEY")
     if nvidia_key and nvidia_key.startswith("nvapi-"):
         try:
@@ -100,18 +242,6 @@ def generate_text_summary(prompt):
                 "https://integrate.api.nvidia.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {nvidia_key}"},
                 json={"model": "meta/llama-3.1-8b-instruct", "messages": messages, "max_tokens": 1024},
-                timeout=30
-            )
-            if resp.status_code == 200: return resp.json()["choices"][0]["message"]["content"]
-        except: pass
-
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    if openrouter_key:
-        try:
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {openrouter_key}"},
-                json={"model": "mistralai/mistral-nemo", "messages": messages},
                 timeout=30
             )
             if resp.status_code == 200: return resp.json()["choices"][0]["message"]["content"]
