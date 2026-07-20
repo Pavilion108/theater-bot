@@ -12,10 +12,12 @@ log = logging.getLogger("MediaIntel")
 
 # Vision models ranked by capability for image analysis (not generation)
 VISION_MODELS = [
-    "google/gemini-2.5-flash",
-    "google/gemini-2.0-flash-001",
-    "google/gemini-1.5-pro",
-    "google/gemini-1.5-flash"
+    "google/gemini-3.1-flash-lite-image",
+    "google/gemini-3.1-flash-image",
+    "google/gemini-3-pro-image",
+    "x-ai/grok-imagine-image-quality",
+    "sourceful/riverflow-v2.5-pro",
+    "recraft/recraft-v4.1-pro-vector"
 ]
 
 INTEL_PROMPT = (
