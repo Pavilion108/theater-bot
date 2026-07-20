@@ -95,7 +95,7 @@ class TheaterBot:
         self.selected_showtime = None
         
         self.ticket_count = 0
-        
+        self.last_intel_summary = ""
         self.start_time = datetime.now(timezone.utc)
         
         self._selector = None  # Lazy-loaded to save memory
@@ -408,6 +408,48 @@ class TheaterBot:
             else:
                 self.send(get_cookie_export_snippet())
             return
+            
+        if text_stripped.lower().startswith("/ask "):
+            query = text_stripped[5:].strip()
+            self.send(f"🤖 Researching: {query}...")
+            
+            prompt = f"You are an AI research assistant. Provide a detailed answer. If relevant, here is the summary of the last image processed:\n\n{self.last_intel_summary}\n\nUser Question: {query}"
+            
+            def run_ask():
+                try:
+                    from media_intel import generate_text_summary
+                    answer = generate_text_summary(prompt)
+                    self.send(f"🧠 *AI Response*\n\n{answer}")
+                except Exception as e:
+                    log.error(f"Failed to ask openrouter: {e}")
+                    self.send("❌ Failed to get answer.")
+            
+            threading.Thread(target=run_ask, daemon=True).start()
+            return
+
+        if text_stripped.lower().startswith("/save ") or text_stripped.lower().startswith("/mark "):
+            content = text_stripped.split(" ", 1)[1].strip()
+            self.send(f"💾 Saving to Salary Tracker Portal...")
+            
+            def run_save():
+                try:
+                    url = "https://salary-tracker-web.vercel.app/api/bot-inbox"
+                    headers = {
+                        "Authorization": "Bearer my-super-secret-bot-key",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {"text": content, "source": "Telegram Agent-T"}
+                    resp = requests.post(url, json=payload, headers=headers, timeout=10)
+                    if resp.status_code == 200:
+                        self.send("✅ Successfully saved to your Salary Project Note Area!")
+                    else:
+                        self.send(f"❌ Failed to save. Server returned {resp.status_code}.")
+                except Exception as e:
+                    log.error(f"Webhook save error: {e}")
+                    self.send("❌ Could not connect to Salary Tracker Portal.")
+                    
+            threading.Thread(target=run_save, daemon=True).start()
+            return
 
         try:
             if text_stripped.lower() == "back":
@@ -518,6 +560,8 @@ class TheaterBot:
                     category = intel.get('category', 'Other')
                     sentiment = intel.get('sentiment', '')
                     key_data = intel.get('key_data', '')
+                    
+                    self.last_intel_summary = intel.get('summary', '')
                     source = intel.get('source', '')
                     action_items = intel.get('action_items', 'None')
                     
