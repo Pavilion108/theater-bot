@@ -17,7 +17,8 @@ VISION_MODELS = [
     "google/gemini-3-pro-image",
     "x-ai/grok-imagine-image-quality",
     "sourceful/riverflow-v2.5-pro",
-    "recraft/recraft-v4.1-pro-vector"
+    "recraft/recraft-v4.1-pro-vector",
+    "openrouter/free"
 ]
 
 INTEL_PROMPT = (
