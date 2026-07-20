@@ -227,21 +227,34 @@ def analyze_media(file_path, file_type, status_callback=None):
 
 
 def generate_text_summary(prompt):
-    """Uses available AI APIs to generate a daily summary from Excel text data."""
+    """Uses available AI APIs to generate a text response, with fallback."""
     messages = [{"role": "user", "content": prompt}]
     
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
     if openrouter_key:
-        try:
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {openrouter_key}"},
-                json={"model": "google/gemini-2.5-flash", "messages": messages, "max_tokens": 1024},
-                timeout=30
-            )
-            if resp.status_code == 200: return resp.json()["choices"][0]["message"]["content"]
-        except: pass
+        TEXT_MODELS = [
+            "google/gemini-2.5-flash",
+            "meta-llama/llama-3.1-8b-instruct",
+            "anthropic/claude-3-haiku",
+            "openrouter/free"
+        ]
+        
+        for model in TEXT_MODELS:
+            try:
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {openrouter_key}"},
+                    json={"model": model, "messages": messages, "max_tokens": 1024},
+                    timeout=30
+                )
+                if resp.status_code == 200: 
+                    return resp.json()["choices"][0]["message"]["content"]
+                else:
+                    log.warning(f"OpenRouter text model {model} failed: {resp.status_code} - {resp.text}")
+            except Exception as e: 
+                log.warning(f"Exception calling {model}: {e}")
 
+    # Fallbacks for other providers
     nvidia_key = os.getenv("NVIDIA_API_KEY") or os.getenv("KIMI_API_KEY")
     if nvidia_key and nvidia_key.startswith("nvapi-"):
         try:
