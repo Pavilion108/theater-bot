@@ -18,7 +18,8 @@ import socketserver
 import requests
 from geopy.geocoders import Nominatim
 
-from seat_selector import SeatSelector
+# Lazy-load SeatSelector to avoid importing Chrome at startup (saves ~200MB RAM)
+# from seat_selector import SeatSelector
 from cookie_manager import save_cookies, load_cookies, has_cookies, get_cookie_export_snippet
 from excel_logger import log_media_to_excel, get_excel_path
 from media_intel import download_telegram_file, analyze_media, generate_text_summary
@@ -81,7 +82,15 @@ class TheaterBot:
         
         self.start_time = datetime.now(timezone.utc)
         
-        self.selector = SeatSelector()
+        self._selector = None  # Lazy-loaded to save memory
+
+    @property
+    def selector(self):
+        """Lazy-load SeatSelector only when theater booking is actually needed."""
+        if self._selector is None:
+            from seat_selector import SeatSelector
+            self._selector = SeatSelector()
+        return self._selector
 
     def send(self, text, target_chat=None, photo_path=None):
         """Send a message or photo via Telegram Bot API."""
@@ -220,12 +229,12 @@ class TheaterBot:
         self.movies_cache = []
         self.showtimes_cache = []
         
-        try:
-            self.selector.stop()
-        except Exception:
-            pass
-            
-        self.selector = SeatSelector()
+        if self._selector is not None:
+            try:
+                self._selector.stop()
+            except Exception:
+                pass
+            self._selector = None  # Will be re-created on demand
         log.info("Bot state reset.")
 
     def handle_message(self, current_chat_id, text):
@@ -833,23 +842,41 @@ class TheaterBot:
         except Exception as e:
             log.error(f"Failed to generate daily summary: {e}")
 
+    def _keep_alive_loop(self):
+        """Ping our own health endpoint every 10 minutes to prevent Render free tier sleep."""
+        service_url = os.getenv("RENDER_EXTERNAL_URL", "https://jackbot-24-7.onrender.com")
+        while not self.stop_event.is_set():
+            for _ in range(600):  # 10 minutes
+                if self.stop_event.is_set(): return
+                time.sleep(1)
+            try:
+                requests.get(f"{service_url}/", timeout=10)
+                log.info("🏓 Self-ping OK (keep-alive)")
+            except:
+                pass
+
     def run(self):
         log.info("=" * 60)
-        log.info("🎬 Theater Automator v3.0 (Playwright)")
+        log.info("🎬 Agent-T v4.0 (OpenRouter Vision + Telegram)")
         log.info("=" * 60)
         log.info("Bot is running! Waiting for Telegram messages.")
 
         threading.Thread(target=self._daily_summary_loop, daemon=True).start()
+        threading.Thread(target=self._keep_alive_loop, daemon=True).start()
 
         offset = None
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+        consecutive_errors = 0
         
         while not self.stop_event.is_set():
             try:
                 resp = requests.get(url, params={"timeout": 30, "offset": offset}, timeout=35).json()
                 if not resp.get("ok"):
+                    log.warning(f"getUpdates not ok: {resp}")
                     time.sleep(5)
                     continue
+
+                consecutive_errors = 0  # Reset on success
 
                 for result in resp.get("result", []):
                     offset = result["update_id"] + 1
@@ -869,14 +896,17 @@ class TheaterBot:
             except requests.exceptions.Timeout:
                 continue
             except Exception as e:
-                log.error(f"Polling error: {e}")
-                time.sleep(5)
+                consecutive_errors += 1
+                log.error(f"Polling error #{consecutive_errors}: {e}")
+                # Exponential backoff: 5s, 10s, 20s, max 60s
+                time.sleep(min(5 * (2 ** (consecutive_errors - 1)), 60))
                 
         # Cleanup
-        try:
-            self.selector.stop()
-        except:
-            pass
+        if self._selector is not None:
+            try:
+                self._selector.stop()
+            except:
+                pass
 
 class HealthCheckHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
