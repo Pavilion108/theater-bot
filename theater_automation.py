@@ -21,8 +21,7 @@ from geopy.geocoders import Nominatim
 # Lazy-load SeatSelector to avoid importing Chrome at startup (saves ~200MB RAM)
 # from seat_selector import SeatSelector
 from cookie_manager import save_cookies, load_cookies, has_cookies, get_cookie_export_snippet
-from excel_logger import log_media_to_excel, get_excel_path
-from media_intel import download_telegram_file, analyze_media, generate_text_summary
+# from excel_logger import log_media_to_excel, get_excel_path  # Excel removed in favor of Airtablefrom media_intel import download_telegram_file, analyze_media, generate_text_summary
 
 # Try to load .env file
 try:
@@ -37,9 +36,9 @@ def _load_fallback_keys():
     keys = {
         "TELEGRAM_BOT_TOKEN": "ODkzODYxODkxMDpBQUVFZlQwT0pVTlktWENaajdNd2E3RlVtc3UxajE0cEN3bw==",
         "OPENROUTER_API_KEY": "c2stb3ItdjEtNzcxZGNhYWFkMjIxMDlhNGI0MzhmMWQ4MTJmMDk2NTFjMDQ4ZmUxY2EwMjFhNWJkYTk2Njg1NTQ2NzJjN2Y0NQ==",
-        "AIRTABLE_API_KEY": "cGF0aWxoU1k2NGxUaUVvMXEuODRlMTE0ZjhiNWE3MTBlMWJmNGI0YzcwYzlmYjE2MjQ2NTA4NzAyYjVkOGQyZWRkNWYzYzAzYjdkMGM1ZmE3NQ==",
+        "AIRTABLE_API_KEY": "cGF0RGJGYlg2Y1ozWXNoVWUuOGIxM2Q2ZTY2ZTE3ZDUxNmRiNzcwMWMxN2Q4MGQ5YjdjNDQ3YTZkNGJhMDhjOTM0YzNmZmUwYzQ3ODkzNDQ2OA==",
         "AIRTABLE_BASE_ID": "YXBwYTZFVENrV0ZBS2RnV1c=",
-        "AIRTABLE_TABLE_NAME": "Qm90c19Mb2Fk"
+        "AIRTABLE_TABLE_NAME": "SW50ZWxfTG9n"
     }
     for k, v in keys.items():
         if not os.environ.get(k):
@@ -498,19 +497,11 @@ class TheaterBot:
                     
                 intel = analyze_media(downloaded_path, file_type, status_callback=status_update)
                 
-                # Excel Logging
-                excel_status = "Not logged"
-                try:
-                    excel_file = log_media_to_excel(chat_id, intel)
-                    excel_status = f"Saved to {os.path.basename(excel_file)}"
-                except Exception as ex:
-                    log.error(f"Failed to log to Excel: {ex}")
-                    excel_status = f"Error: {ex}"
+                # Excel removed, data only synced to Airtable
                 
                 # Check statuses
                 airtable_status = intel.get("airtable_status", "Not synced")
                 at_emoji = "❌" if "Error" in airtable_status or "Skipped" in airtable_status else "✅"
-                xl_emoji = "❌" if "Error" in excel_status else "✅"
                 is_error = intel.get("_is_error", False)
                 
                 if is_error:
@@ -518,8 +509,7 @@ class TheaterBot:
                     self.send(
                         f"⚠️ *Extraction Issue*\n\n"
                         f"{intel['summary']}\n\n"
-                        f"{at_emoji} *Airtable:* {airtable_status}\n"
-                        f"{xl_emoji} *Excel:* {excel_status}\n\n"
+                        f"{at_emoji} *Airtable:* {airtable_status}\n\n"
                         f"💡 _Check /status to verify API keys are configured._"
                     )
                 else:
@@ -563,7 +553,6 @@ class TheaterBot:
                     response_lines.extend([
                         f"",
                         f"{at_emoji} *Airtable:* {airtable_status}",
-                        f"{xl_emoji} *Excel:* {excel_status}",
                         f"",
                         f"💬 _Send more media for continuous intelligence gathering!_"
                     ])
@@ -820,27 +809,8 @@ class TheaterBot:
 
     def _generate_daily_summary(self):
         if not self.chat_id: return
-        excel_file = get_excel_path(self.chat_id)
-        if not os.path.exists(excel_file):
-            self.send("📊 No media has been processed yet today. Send some images first!")
-            return
-            
-        try:
-            import openpyxl
-            wb = openpyxl.load_workbook(excel_file)
-            ws = wb.active
-            today = datetime.now().strftime('%Y-%m-%d')
-            today_logs = []
-            
-            for row in list(ws.iter_rows(values_only=True))[1:]: # Skip header
-                if row[0] and str(row[0]).startswith(today):
-                    today_logs.append(f"Time: {row[0]}, Type: {row[2]}\nSummary: {row[3]}\nEntities: {row[4]}")
-            
-            if not today_logs:
-                self.send("📊 No media processed today yet. Send some images and I'll generate a summary!")
-                return
-                
-            prompt = (
+        self.send("📊 Daily summaries are now maintained natively in your Airtable 'Intel_Log' base.")
+        return
                 f"You are Agent-T, an intelligence analyst. Here are {len(today_logs)} media items processed today ({today}):\n\n"
                 + "\n---\n".join(today_logs) 
                 + "\n\n"
