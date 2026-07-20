@@ -21,7 +21,8 @@ from geopy.geocoders import Nominatim
 # Lazy-load SeatSelector to avoid importing Chrome at startup (saves ~200MB RAM)
 # from seat_selector import SeatSelector
 from cookie_manager import save_cookies, load_cookies, has_cookies, get_cookie_export_snippet
-# from excel_logger import log_media_to_excel, get_excel_path  # Excel removed in favor of Airtablefrom media_intel import download_telegram_file, analyze_media, generate_text_summary
+# Excel removed in favor of Airtable
+from media_intel import download_telegram_file, analyze_media, generate_text_summary
 
 # Try to load .env file
 try:
