@@ -12,9 +12,10 @@ log = logging.getLogger("MediaIntel")
 
 # Vision models ranked by capability for image analysis (not generation)
 VISION_MODELS = [
-    "google/gemini-2.5-flash",          # Fast, excellent vision, cheap
-    "google/gemini-2.0-flash-001",      # Strong fallback
-    "meta-llama/llama-4-scout",         # Free tier capable vision
+    "google/gemini-2.5-flash",
+    "google/gemini-2.0-flash-001",
+    "google/gemini-1.5-pro",
+    "google/gemini-1.5-flash"
 ]
 
 INTEL_PROMPT = (
@@ -143,6 +144,7 @@ def analyze_media(file_path, file_type, status_callback=None):
         # Try each vision model in order until one works
         response_text = None
         model_used = None
+        last_error = "Unknown Error"
         
         for model in VISION_MODELS:
             if status_callback: status_callback(f"🔍 Analyzing with `{model.split('/')[-1]}`...")
@@ -155,19 +157,21 @@ def analyze_media(file_path, file_type, status_callback=None):
                     log.info(f"Got response from {model_used} ({len(response_text)} chars)")
                     break
                 else:
+                    last_error = f"Model {model} returned empty/invalid response"
                     response_text = None
             except Exception as e:
                 log.warning(f"Model {model} failed: {e}")
+                last_error = str(e)
                 continue
         
         if not response_text:
             return {
                 "filename": filename,
                 "file_type": file_type,
-                "summary": "Error: All AI vision models failed to analyze this image. Check your OpenRouter API key balance.",
+                "summary": f"❌ OpenRouter API completely failed. Last error: {last_error}",
                 "entities": "Error",
                 "_is_error": True,
-                "airtable_status": "Skipped (All Models Failed)"
+                "airtable_status": "Failed"
             }
         
         if status_callback: status_callback(f"✅ AI response received from `{model_used.split('/')[-1] if model_used else 'unknown'}`. Parsing...")
