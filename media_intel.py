@@ -22,13 +22,12 @@ VISION_MODELS = [
 ]
 
 INTEL_PROMPT = (
-    "Analyze this media and extract intelligence. Return the result STRICTLY as a JSON object with these keys: "
-    "'summary' (2-3 sentences), 'category' (News, Politics, Finance, Tech, Entertainment, Sports, Health, or Other), "
-    "'entities' (comma separated list of people, organizations, locations), "
-    "'sentiment' (Positive, Negative, Neutral, or Mixed), "
-    "'key_data' (any important numbers, dates, or metrics, else 'None'), "
-    "'source' (the likely source of this media, else 'Unknown'), "
-    "'action_items' (1-2 bullet points if applicable, else 'None'). "
+    "Analyze this media and extract intelligence exactly as shown. Return the result STRICTLY as a JSON object with these keys: "
+    "'main_subject' (1 short sentence identifying the core subject), "
+    "'exact_text' (Extract the exact wording, text, and numbers visible in the image, as-is), "
+    "'visual_elements' (Describe exactly what visual objects, charts, or scenes are shown), "
+    "'key_info' (Direct bullet points of the most important information conveyed), "
+    "'entities' (People, brands, organizations, or places clearly shown). "
     "Return ONLY the JSON object, no markdown fences, no explanation."
 )
 
@@ -183,13 +182,11 @@ def analyze_media(file_path, file_type, status_callback=None):
         result_data = {
             "filename": filename,
             "file_type": file_type,
-            "summary": response_text[:1000] if len(response_text) > 1000 else response_text,
+            "main_subject": "Unknown",
+            "exact_text": "None",
+            "visual_elements": "None",
+            "key_info": "None",
             "entities": "None",
-            "category": "Other",
-            "sentiment": "Neutral",
-            "key_data": "None",
-            "source": "Unknown",
-            "action_items": "None",
             "model_used": model_used or "unknown",
         }
         
@@ -203,11 +200,12 @@ def analyze_media(file_path, file_type, status_callback=None):
             match = re.search(r'\{.*\}', cleaned.replace('\n', ' '), re.DOTALL)
             if match:
                 parsed = json.loads(match.group(0))
-                for k in ["summary", "entities", "category", "sentiment", "key_data", "source", "action_items"]:
+                for k in ["main_subject", "exact_text", "visual_elements", "key_info", "entities"]:
                     if k in parsed:
                         result_data[k] = str(parsed[k])
         except:
-            pass  # Fallback to the raw text in summary field
+            # Fallback to the raw text in exact_text field
+            result_data["exact_text"] = response_text[:1000] if len(response_text) > 1000 else response_text
             
         # Log to Airtable
         airtable_success, airtable_msg = log_to_airtable(result_data)

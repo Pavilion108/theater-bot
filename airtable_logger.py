@@ -77,20 +77,16 @@ def log_to_airtable(data, file_path=None):
         "Timestamp": datetime.datetime.now().isoformat(),
         "Filename": data.get("filename", ""),
         "File Type": data.get("file_type", ""),
-        "Summary": data.get("summary", "No summary extracted"),
+        "Main Subject": data.get("main_subject", ""),
+        "Exact Text": data.get("exact_text", "No text extracted"),
+        "Visual Elements": data.get("visual_elements", ""),
+        "Key Info": data.get("key_info", ""),
         "Entities": data.get("entities", ""),
     }
     
     # Add optional enriched fields if they exist in Airtable
     # (Airtable will ignore fields that don't exist in the table schema)
-    optional_fields = {
-        "Category": data.get("category", ""),
-        "Sentiment": data.get("sentiment", ""),
-        "Key Data": data.get("key_data", ""),
-        "Source": data.get("source", ""),
-        "Language": data.get("language", ""),
-        "Action Items": data.get("action_items", ""),
-    }
+    optional_fields = {}
     
     for key, value in optional_fields.items():
         if value:
@@ -131,8 +127,8 @@ def log_to_airtable(data, file_path=None):
                                 "Timestamp": fields["Timestamp"],
                                 "Filename": fields["Filename"],
                                 "File Type": fields["File Type"],
-                                "Summary": fields["Summary"],
-                                "Entities": fields["Entities"],
+                                "Main Subject": fields.get("Main Subject", ""),
+                                "Exact Text": fields.get("Exact Text", ""),
                             }
                         }],
                         "typecast": True
